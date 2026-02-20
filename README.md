@@ -60,6 +60,23 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 The `--reload` flag means the server will automatically restart whenever you save changes to your Python code.
 
+### 3. Viewing the Database (pgAdmin)
+
+The `docker-compose.yml` file also spins up **pgAdmin**, a web-based GUI for PostgreSQL.
+
+1. Navigate to [http://localhost:5050](http://localhost:5050) in your browser.
+2. Login with the default credentials:
+   - **Email:** `admin@admin.com`
+   - **Password:** `admin`
+3. Click "Add New Server":
+   - **General Tab:** Name it whatever you like (e.g., "OnTime Local").
+   - **Connection Tab:** Use the following settings:
+     - **Host name/address:** `db`  *(This is the internal docker network name for Postgres)*
+     - **Port:** `5432`
+     - **Username:** `postgres`
+     - **Password:** `postgres`
+4. Save
+
 ---
 
 ## Exploring the API Documentation

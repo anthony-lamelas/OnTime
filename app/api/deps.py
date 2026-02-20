@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 import jwt
 from pydantic import ValidationError
 
-from app.db.session import get_db_connection
+from app.db.session import connection_pool
 from app.core.config import settings
 from app.core import security
 from app.schemas.token import TokenPayload
@@ -13,11 +13,11 @@ from app.schemas.user import UserResponse
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 def get_db() -> Generator:
+    conn = connection_pool.getconn()
     try:
-        conn = next(get_db_connection())
         yield conn
     finally:
-        pass # connection closure is handled by the generator in session.py
+        connection_pool.putconn(conn)
 
 def get_current_user(db = Depends(get_db), token: str = Depends(oauth2_scheme)) -> UserResponse:
     try:

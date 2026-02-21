@@ -1,0 +1,16 @@
+# Mac system files
+.DS_Store
+
+# IDEs and Editors
+.idea/
+.vscode/
+
+# Ignore the virtual environment
+myenv/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc

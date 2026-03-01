@@ -1,3 +1,6 @@
+__pycache__/
+.env
+venv/
 # Mac system files
 .DS_Store
 

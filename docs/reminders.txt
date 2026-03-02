@@ -1,0 +1,1 @@
+- Don't forget to delete JWT from the frontend in order to logout

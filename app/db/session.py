@@ -2,7 +2,8 @@ import psycopg2
 from psycopg2 import pool
 from app.core.config import settings
 
-# Create a connection pool to handle multiple concurrent requests
+connection_pool = None
+
 try:
     connection_pool = psycopg2.pool.SimpleConnectionPool(
         1,  # min

@@ -17,3 +17,6 @@ myenv/
 # Ignore Python cache files
 __pycache__/
 *.pyc
+
+# Ignore pytest cache
+.pytest_cache/

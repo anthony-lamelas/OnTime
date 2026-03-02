@@ -93,7 +93,7 @@ To stop the FastAPI server, press `Ctrl+C` in the terminal where it is running.
 To stop the Docker database container, run:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ---

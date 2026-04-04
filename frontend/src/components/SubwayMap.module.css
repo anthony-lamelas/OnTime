@@ -1,0 +1,213 @@
+.mapWrapper {
+  flex: 1;
+  position: relative;
+  background: #0f1117;
+  overflow: hidden;
+}
+
+.tokenWarning {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f1117;
+  color: #f97316;
+  font-size: 14px;
+  z-index: 10;
+  padding: 24px;
+  text-align: center;
+}
+
+/* Hold hint */
+.holdHint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15,17,23,0.75);
+  backdrop-filter: blur(6px);
+  color: rgba(232,234,246,0.6);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+/* Press-and-hold ripple (absolutely positioned over the map canvas) */
+.rippleContainer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.rippleCore {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(79,110,247,0.9);
+}
+
+.rippleRing {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(79,110,247,0.6);
+  animation: ringFill 0.55s ease-out forwards;
+}
+
+@keyframes ringFill {
+  0%   { transform: scale(0.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 0.2; }
+}
+
+/* User location: pulsing dot */
+.userDot {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.userDotCore {
+  width: 14px;
+  height: 14px;
+  background: #4f6ef7;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 2px rgba(79,110,247,0.4);
+  z-index: 1;
+}
+
+.userDotRing {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(79,110,247,0.2);
+  animation: ripple 1.8s ease-out infinite;
+}
+
+@keyframes ripple {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* Station ring marker */
+.stationMarker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1a1d27;
+  border: 2.5px solid;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Destination teardrop */
+.destPin {
+  width: 18px;
+  height: 18px;
+  background: #f97316;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Dropped (long-pressed) pin */
+.droppedPin {
+  width: 22px;
+  height: 22px;
+  background: #a855f7;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2.5px solid #fff;
+  box-shadow: 0 4px 16px rgba(168,85,247,0.5);
+  animation: pinDrop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes pinDrop {
+  0%   { transform: rotate(-45deg) translateY(-30px) scale(0.8); opacity: 0; }
+  100% { transform: rotate(-45deg) translateY(0)     scale(1);   opacity: 1; }
+}
+
+/* Pin popup */
+.pinPopup :global(.mapboxgl-popup-content) {
+  background: #1a1d27;
+  border: 1px solid #2e3248;
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  color: #e8eaf6;
+  min-width: 180px;
+}
+
+.pinPopup :global(.mapboxgl-popup-tip) {
+  border-top-color: #1a1d27;
+}
+
+.pinPopupContent {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pinPopupTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8eaf6;
+  margin: 0;
+}
+
+.pinPopupActions {
+  display: flex;
+  gap: 6px;
+}
+
+.pinBtn {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pinBtn:hover { opacity: 0.85; }
+
+.pinBtnOrigin {
+  background: rgba(79,110,247,0.2);
+  color: #818cf8;
+  border: 1px solid rgba(79,110,247,0.3);
+}
+
+.pinBtnDest {
+  background: rgba(249,115,22,0.2);
+  color: #fb923c;
+  border: 1px solid rgba(249,115,22,0.3);
+}
+
+.pinDismiss {
+  background: none;
+  border: none;
+  color: #7b7f9e;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+}
+
+.pinDismiss:hover { color: #e8eaf6; }

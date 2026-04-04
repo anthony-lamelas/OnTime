@@ -157,3 +157,47 @@ async def get_live_subway_data(line: Optional[str] = None) -> dict:
 
     messages = [_parse_feed(raw) for raw in raw_feeds]
     return _merge_feeds(messages)
+
+
+async def next_departure_minutes(stop_id: str, lines: list[str]) -> int | None:
+    """Return minutes until the next train departs from stop_id on any of `lines`.
+
+    Returns None if no live data is available.
+    """
+    import time as _time
+
+    feed_keys = list({LINE_TO_FEED[l] for l in lines if l in LINE_TO_FEED})
+    if not feed_keys:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            raw_feeds = await asyncio.gather(*[_fetch_feed(client, k) for k in feed_keys])
+        messages = [_parse_feed(raw) for raw in raw_feeds]
+    except Exception:
+        return None
+
+    now = int(_time.time())
+    soonest: int | None = None
+
+    for msg in messages:
+        for entity in msg.entity:  # type: ignore[attr-defined]
+            if not entity.HasField("trip_update"):
+                continue
+            tu = entity.trip_update
+            if tu.trip.route_id not in lines:
+                continue
+            for stu in tu.stop_time_update:
+                # GTFS-RT stop IDs have N/S suffix; strip to match our IDs
+                if stu.stop_id.rstrip("NS") != stop_id:
+                    continue
+                t = stu.departure.time if stu.HasField("departure") else (
+                    stu.arrival.time if stu.HasField("arrival") else None
+                )
+                if t and t > now:
+                    if soonest is None or t < soonest:
+                        soonest = t
+
+    if soonest is None:
+        return None
+    return max(0, (soonest - now) // 60)

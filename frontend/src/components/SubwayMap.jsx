@@ -7,23 +7,11 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const NYC_CENTER = { longitude: -73.9857, latitude: 40.7484 }
 const LONG_PRESS_MS = 550
 
-const SUBWAY_LINES_URL =
-  'https://data.cityofnewyork.us/api/geospatial/3qem-6v3v?method=export&type=GeoJSON'
+// ArcGIS endpoint (NYC OTI) — replaced the broken Socrata URL
+const ARCGIS_BASE =
+  'https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Subway_view/FeatureServer/0/query'
+const ARCGIS_PARAMS = '?where=1%3D1&outFields=ROUTE&f=geojson&resultRecordCount=2000'
 
-const LINE_COLOR_EXPR = [
-  'match', ['get', 'rt_symbol'],
-  '1', '#EE352E', '2', '#EE352E', '3', '#EE352E',
-  '4', '#00933C', '5', '#00933C', '6', '#00933C',
-  '7', '#B933AD',
-  'A', '#0039A6', 'C', '#0039A6', 'E', '#0039A6',
-  'B', '#FF6319', 'D', '#FF6319', 'F', '#FF6319', 'M', '#FF6319',
-  'G', '#6CBE45',
-  'J', '#996633', 'Z', '#996633',
-  'L', '#A7A9AC',
-  'N', '#FCCC0A', 'Q', '#FCCC0A', 'R', '#FCCC0A', 'W', '#FCCC0A',
-  'S', '#808183',
-  '#888888'
-]
 
 // Build a GeoJSON of real subway track segments that fall within the route's bounding box
 // and belong to lines used in the route. This follows actual track geometry instead of
@@ -59,7 +47,7 @@ export function routeSubwayGeoJSON(stations, subwayLines) {
   }
 
   const features = subwayLines.features.filter(f => {
-    const sym = f.properties?.rt_symbol
+    const sym = f.properties?.ROUTE
     return routeLines.has(sym) && geomOverlapsBox(f.geometry)
   })
 
@@ -94,7 +82,21 @@ export default function SubwayMap({
   const [droppedPin, setDroppedPin] = useState(null)  // {lat, lon} – confirmed pin with popup
 
   useEffect(() => {
-    fetch(SUBWAY_LINES_URL).then(r => r.json()).then(setSubwayLines).catch(console.error)
+    // Paginate through ArcGIS (max 2000/page) until all features are collected
+    async function fetchAllLines() {
+      const allFeatures = []
+      let offset = 0
+      while (true) {
+        const res = await fetch(`${ARCGIS_BASE}${ARCGIS_PARAMS}&resultOffset=${offset}`)
+        const data = await res.json()
+        const features = data.features ?? []
+        allFeatures.push(...features)
+        if (features.length < 2000) break   // last page
+        offset += 2000
+      }
+      setSubwayLines({ type: 'FeatureCollection', features: allFeatures })
+    }
+    fetchAllLines().catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -188,6 +190,18 @@ export default function SubwayMap({
   if (route?.found) {
     try { routeGeoJSON = routeSubwayGeoJSON(route.stations, subwayLines) }
     catch (e) { console.error('routeSubwayGeoJSON failed:', e) }
+    // Fallback: straight lines between stations until real geometry loads
+    if (!routeGeoJSON) {
+      const coords = route.stations
+        .filter(s => s.lon != null && s.lat != null)
+        .map(s => [s.lon, s.lat])
+      if (coords.length >= 2) {
+        routeGeoJSON = {
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }],
+        }
+      }
+    }
   }
   const userToStation  = walkLineGeoJSON(userLocation, userStation)
   const destToStation  = walkLineGeoJSON(destination, destStation)
@@ -231,18 +245,18 @@ export default function SubwayMap({
       >
         <NavigationControl position="top-right" />
 
-        {/* Subway lines */}
+        {/* Subway network background — ArcGIS track geometry, uniform dim color */}
         {subwayLines && (
           <Source id="subway-lines" type="geojson" data={subwayLines}>
             <Layer id="subway-lines-casing" type="line"
-              paint={{ 'line-color': '#000', 'line-width': 4, 'line-opacity': 0.5 }}
+              paint={{ 'line-color': '#000', 'line-width': 4, 'line-opacity': 0.4 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             <Layer id="subway-lines-fill" type="line"
               paint={{
-                'line-color': LINE_COLOR_EXPR,
-                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 3],
-                'line-opacity': 0.8,
+                'line-color': '#4a4f6a',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 2.5],
+                'line-opacity': 0.7,
               }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />

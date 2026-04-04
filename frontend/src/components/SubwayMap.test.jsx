@@ -50,10 +50,10 @@ function makeSubwayLines(features = []) {
   return { type: 'FeatureCollection', features }
 }
 
-function lineFeature(rt_symbol, coords) {
+function lineFeature(ROUTE, coords) {
   return {
     type: 'Feature',
-    properties: { rt_symbol },
+    properties: { ROUTE },
     geometry: { type: 'LineString', coordinates: coords },
   }
 }
@@ -129,7 +129,7 @@ describe('routeSubwayGeoJSON', () => {
     const result = routeSubwayGeoJSON(ROUTE_STATIONS, lines)
     expect(result).not.toBeNull()
     expect(result.features).toHaveLength(1)
-    expect(result.features[0].properties.rt_symbol).toBe('4')
+    expect(result.features[0].properties.ROUTE).toBe('4')
   })
 
   it('filters out features outside the bbox even if line matches', () => {
@@ -144,7 +144,7 @@ describe('routeSubwayGeoJSON', () => {
   it('handles MultiLineString geometry', () => {
     const feature = {
       type: 'Feature',
-      properties: { rt_symbol: '6' },
+      properties: { ROUTE: '6' },
       geometry: {
         type: 'MultiLineString',
         coordinates: [

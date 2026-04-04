@@ -36,6 +36,24 @@ The application requires certain environment variables to run.
 1.  Copy the `.env.example` file and rename it to `.env`.
 2.  The default `.env` is already pre-configured for local Docker development. It contains the local connection string for PostgreSQL (`postgresql://postgres:postgres@localhost:5433/ontime`) and a default `SECRET_KEY` for JWT tokens.
 
+### 4. Set up the Frontend
+
+The frontend map application runs on React and Vite. You'll need to set up the Mapbox integration for it to render correctly. Ensure that you have npm installed.
+
+1.  Navigate to the `frontend` directory:
+    ```bash
+    cd frontend
+    ```
+2.  Install the JavaScript dependencies:
+    ```bash
+    npm install
+    ```
+3.  Create your environment file by copying the example:
+    ```bash
+    cp .env.example .env
+    ```
+4.  Open the newly created `frontend/.env` file and replace `your_mapbox_public_token_here` with a real Mapbox Public Token.
+
 ---
 
 ## Running the Application Locally
@@ -76,6 +94,17 @@ The `docker-compose.yml` file also spins up **pgAdmin**, a web-based GUI for Pos
      - **Username:** `postgres`
      - **Password:** `postgres`
 4. Save
+
+### 4. Start the Frontend Development Server
+
+Open a new terminal session, navigate to the `frontend` directory, and start the development server using Vite:
+
+```bash
+cd frontend
+npm run dev
+```
+
+You can view the full application (with the subway map) by navigating to [http://localhost:5173/](http://localhost:5173/) or the port specified in your terminal output.
 
 ---
 

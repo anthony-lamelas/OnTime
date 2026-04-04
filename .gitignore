@@ -23,3 +23,6 @@ __pycache__/
 
 # Ignore SSL certificates
 *.pem
+
+# Ignore model files
+ml_service/models/delay_model.joblib

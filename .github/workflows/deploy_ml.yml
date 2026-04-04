@@ -1,0 +1,44 @@
+name: Deploy ML Microservice
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ml_service/models/**'  # Only trigger when the models change
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Secure Copy (SCP) New Code to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AWS_EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.AWS_EC2_PEM }}
+          source: "ml_service"
+          target: "~"
+
+      - name: SSH and Rebuild Docker
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.AWS_EC2_PEM }}
+          script: |
+            # Navigate to the newly uploaded directory
+            cd ~/ml_service
+            
+            # Rebuild the Docker image with the new model
+            docker build -t ontime-ml .
+            
+            # Stop the old container
+            docker rm -f ml_backend
+            
+            # Start the new container with auto-restart
+            docker run -d --name ml_backend -p 8000:8000 --restart unless-stopped ontime-ml

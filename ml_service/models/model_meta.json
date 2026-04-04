@@ -1,0 +1,28 @@
+{
+  "model_name": "LightGBM",
+  "features": [
+    "stop_sequence",
+    "hour",
+    "count",
+    "year",
+    "month",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "is_rush_hour",
+    "is_late_night",
+    "route_name_enc",
+    "direction_enc",
+    "stop_id_enc",
+    "day_of_week_enc",
+    "season_enc"
+  ],
+  "target": "avg_delay_seconds",
+  "metrics": {
+    "MAE_seconds": 35.49,
+    "RMSE_seconds": 52.3,
+    "R2": 0.3842,
+    "MAPE_pct": 97.35
+  }
+}

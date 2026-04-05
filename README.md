@@ -63,7 +63,7 @@ The frontend map application runs on React and Vite. You'll need to set up the M
 In your terminal, ensure you are in the project root and run:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 *Note: This will download PostgreSQL and map it to port `5433` on your host machine to avoid conflicts.*

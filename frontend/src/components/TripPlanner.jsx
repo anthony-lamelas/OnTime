@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import styles from './TripPlanner.module.css'
+import SidebarNav from './SidebarNav'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -63,7 +64,7 @@ function PlaceSearch({ placeholder, userLocation, onSelect, value }) {
   return (
     <div className={styles.searchWrapper}>
       <div className={styles.searchBox}>
-        <span className={styles.searchIcon}>🔍</span>
+        <span className={styles.searchIcon}></span>
         <input
           className={styles.searchInput}
           type="text"
@@ -113,13 +114,13 @@ function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange
           className={`${styles.toggleBtn} ${mode === 'gps' ? styles.toggleActive : ''}`}
           onClick={switchToGPS}
         >
-          📍 My location
+          My location
         </button>
         <button
           className={`${styles.toggleBtn} ${mode === 'custom' ? styles.toggleActive : ''}`}
           onClick={switchToCustom}
         >
-          ✏️ Enter address
+          Enter address
         </button>
       </div>
 
@@ -169,7 +170,7 @@ function StationChip({ station, label, walkKm, color }) {
         <span className={styles.chipLabel}>{label}</span>
         <span className={styles.chipName}>{station.name}</span>
         <div className={styles.chipMeta}>
-          <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
+          <span className={styles.chipWalk}>{walkMin} min walk</span>
           <span className={styles.chipLines}>
             {station.lines.slice(0, 6).map(l => <LineBadge key={l} line={l} />)}
           </span>
@@ -197,13 +198,13 @@ function TravelCard({ plan }) {
 
       <div className={styles.travelBreakdown}>
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>🚶</span>
+          <span className={styles.travelIcon}>Walk</span>
           <span>{originWalkMin} min</span>
           <span className={styles.travelStepLabel}>walk to station</span>
         </div>
         <div className={styles.travelDivider} />
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>⏱</span>
+          <span className={styles.travelIcon}>Wait</span>
           <span>{tt.wait_minutes ?? 5} min</span>
           <span className={styles.travelStepLabel}>
             wait {tt.live ? <span className={styles.livePill}>live</span> : '(est.)'}
@@ -211,13 +212,13 @@ function TravelCard({ plan }) {
         </div>
         <div className={styles.travelDivider} />
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>🚇</span>
+          <span className={styles.travelIcon}>Ride</span>
           <span>{tt.transit_minutes} min</span>
           <span className={styles.travelStepLabel}>{tt.stops} stops</span>
         </div>
         <div className={styles.travelDivider} />
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>🚶</span>
+          <span className={styles.travelIcon}>Walk</span>
           <span>{destWalkMin} min</span>
           <span className={styles.travelStepLabel}>walk from station</span>
         </div>
@@ -229,6 +230,7 @@ function TravelCard({ plan }) {
 export default function TripPlanner({
   origin, locating, locError, destination, plan, planning,
   onOriginChange, onDestChange, onRequestGPS, onReset,
+  isLoggedIn, setIsLoggedIn, setView,
 }) {
   return (
     <aside className={styles.panel}>
@@ -299,6 +301,13 @@ export default function TripPlanner({
       {destination && (
         <button className={styles.resetBtn} onClick={onReset}>← New search</button>
       )}
+
+      <SidebarNav 
+        isLoggedIn={isLoggedIn} 
+        currentView="home" 
+        setView={setView} 
+        onLogout={() => setIsLoggedIn(false)} 
+      />
     </aside>
   )
 }

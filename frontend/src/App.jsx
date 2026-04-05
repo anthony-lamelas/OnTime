@@ -1,9 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import SubwayMap from './components/SubwayMap'
 import TripPlanner from './components/TripPlanner'
+import FavoritesPanel from './components/FavoritesPanel'
+import PlannedTripsPanel from './components/PlannedTripsPanel'
+import LoginPanel from './components/LoginPanel'
 import styles from './App.module.css'
 
 export default function App() {
+  const [currentView, setCurrentView] = useState('home')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
   // Origin: { lat, lon, label } — either from GPS or user-typed
   const [origin, setOrigin] = useState(null)
   const [locError, setLocError] = useState(null)
@@ -57,10 +63,12 @@ export default function App() {
     })
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(setPlan)
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e)
+        setPlan({ route: { found: false } })
+      })
       .finally(() => setPlanning(false))
   }, [origin, destination])
-
   const handleOriginChange = useCallback((loc) => {
     setOrigin(loc)
     setPlan(null)
@@ -87,18 +95,55 @@ export default function App() {
 
   return (
     <div className={styles.layout}>
-      <TripPlanner
-        origin={origin}
-        locating={locating}
-        locError={locError}
-        destination={destination}
-        plan={plan}
-        planning={planning}
-        onOriginChange={handleOriginChange}
-        onDestChange={handleDestChange}
-        onRequestGPS={requestGPS}
-        onReset={handleReset}
-      />
+      {currentView === 'home' && (
+        <TripPlanner
+          origin={origin}
+          locating={locating}
+          locError={locError}
+          destination={destination}
+          plan={plan}
+          planning={planning}
+          onOriginChange={handleOriginChange}
+          onDestChange={handleDestChange}
+          onRequestGPS={requestGPS}
+          onReset={handleReset}
+          isLoggedIn={isLoggedIn}
+          setIsLoggedIn={setIsLoggedIn}
+          setView={setCurrentView}
+        />
+      )}
+      {currentView === 'favorites' && (
+        <FavoritesPanel
+          setView={setCurrentView}
+          isLoggedIn={isLoggedIn}
+          setIsLoggedIn={setIsLoggedIn}
+          onSelectRoute={(orig, dest) => {
+            setOrigin(orig)
+            setDestination(dest)
+          }}
+          onSelectLocation={(loc) => {
+            setDestination(loc)
+          }}
+        />
+      )}
+      {currentView === 'plannedTrips' && (
+        <PlannedTripsPanel
+          setView={setCurrentView}
+          isLoggedIn={isLoggedIn}
+          setIsLoggedIn={setIsLoggedIn}
+          onSelectRoute={(orig, dest) => {
+            setOrigin(orig)
+            setDestination(dest)
+          }}
+        />
+      )}
+      {currentView === 'login' && (
+        <LoginPanel
+          setView={setCurrentView}
+          isLoggedIn={isLoggedIn}
+          setIsLoggedIn={setIsLoggedIn}
+        />
+      )}
       <SubwayMap
         userLocation={origin}
         userStation={plan?.origin_station}

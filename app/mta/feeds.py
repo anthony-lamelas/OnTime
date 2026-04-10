@@ -201,3 +201,52 @@ async def next_departure_minutes(stop_id: str, lines: list[str]) -> int | None:
     if soonest is None:
         return None
     return max(0, (soonest - now) // 60)
+
+
+async def departure_times_by_line(
+    stop_id: str, lines: list[str]
+) -> dict[str, dict]:
+    """Return {line: {"minutes": int, "live": bool}} for each line in `lines`.
+
+    Falls back to {"minutes": 5, "live": False} for lines with no live data.
+    """
+    import time as _time
+
+    feed_keys = list({LINE_TO_FEED[l] for l in lines if l in LINE_TO_FEED})
+    per_line: dict[str, int | None] = {l: None for l in lines if l in LINE_TO_FEED}
+
+    if feed_keys:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                raw_feeds = await asyncio.gather(*[_fetch_feed(client, k) for k in feed_keys])
+            messages = [_parse_feed(raw) for raw in raw_feeds]
+            now = int(_time.time())
+            for msg in messages:
+                for entity in msg.entity:  # type: ignore[attr-defined]
+                    if not entity.HasField("trip_update"):
+                        continue
+                    tu = entity.trip_update
+                    route = tu.trip.route_id
+                    if route not in per_line:
+                        continue
+                    for stu in tu.stop_time_update:
+                        if stu.stop_id.rstrip("NS") != stop_id:
+                            continue
+                        t = stu.departure.time if stu.HasField("departure") else (
+                            stu.arrival.time if stu.HasField("arrival") else None
+                        )
+                        if t and t > now:
+                            if per_line[route] is None or t < per_line[route]:
+                                per_line[route] = t
+        except Exception:
+            pass  # fall back to all-5
+
+    now_ts = int(_time.time())
+    return {
+        line: (
+            {"minutes": max(0, (t - now_ts) // 60), "live": True}
+            if t is not None
+            else {"minutes": 5, "live": False}
+        )
+        for line, t in per_line.items()
+    }

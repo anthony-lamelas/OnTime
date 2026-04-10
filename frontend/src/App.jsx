@@ -22,6 +22,9 @@ export default function App() {
   const [plan, setPlan] = useState(null)   // PlanOut
   const [planning, setPlanning] = useState(false)
 
+  // Selected line at origin station (null = auto-pick fastest)
+  const [selectedLine, setSelectedLine] = useState(null)
+
   // Request GPS location
   const requestGPS = useCallback(() => {
     if (!navigator.geolocation) {
@@ -46,20 +49,22 @@ export default function App() {
   // Auto-request GPS on mount
   useEffect(() => { requestGPS() }, [])
 
-  // When both origin + destination are set, fetch plan from backend
+  // Fetch plan whenever origin, destination, or selectedLine changes
   useEffect(() => {
     if (!origin || !destination) return
     setPlanning(true)
     setPlan(null)
+    const body = {
+      origin_lat: origin.lat,
+      origin_lon: origin.lon,
+      dest_lat: destination.lat,
+      dest_lon: destination.lon,
+    }
+    if (selectedLine) body.preferred_line = selectedLine
     fetch('/api/subway/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        origin_lat: origin.lat,
-        origin_lon: origin.lon,
-        dest_lat: destination.lat,
-        dest_lon: destination.lon,
-      }),
+      body: JSON.stringify(body),
     })
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(setPlan)
@@ -68,20 +73,29 @@ export default function App() {
         setPlan({ route: { found: false } })
       })
       .finally(() => setPlanning(false))
-  }, [origin, destination])
+  }, [origin, destination, selectedLine])
+
   const handleOriginChange = useCallback((loc) => {
     setOrigin(loc)
     setPlan(null)
+    setSelectedLine(null)
   }, [])
 
   const handleDestChange = useCallback((dest) => {
     setDestination(dest)
     setPlan(null)
+    setSelectedLine(null)
   }, [])
 
   const handleReset = useCallback(() => {
     setDestination(null)
     setPlan(null)
+    setSelectedLine(null)
+  }, [])
+
+  // Toggle: clicking the same line again deselects (reverts to auto-route)
+  const handleLineSelect = useCallback((line) => {
+    setSelectedLine(prev => prev === line ? null : line)
   }, [])
 
   // Map long-press: pinned location → set as origin or destination
@@ -110,6 +124,8 @@ export default function App() {
           isLoggedIn={isLoggedIn}
           setIsLoggedIn={setIsLoggedIn}
           setView={setCurrentView}
+          selectedLine={selectedLine}
+          onLineSelect={handleLineSelect}
         />
       )}
       {currentView === 'favorites' && (

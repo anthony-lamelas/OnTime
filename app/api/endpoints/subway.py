@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.mta.feeds import get_live_subway_data, next_departure_minutes
+from app.mta.feeds import get_live_subway_data, next_departure_minutes, departure_times_by_line
 
 router = APIRouter()
 
@@ -86,6 +86,7 @@ def _dijkstra(
     dest_id: str,
     graph: dict,
     initial_wait_sec: int = 300,
+    preferred_lines: frozenset | None = None,
 ) -> tuple[list[str], int] | None:
     """
     Time-weighted Dijkstra.
@@ -106,6 +107,10 @@ def _dijkstra(
         for nbr_data in graph.get(origin_id, {}).values()
         for line in nbr_data.get("lines", [])
     )
+    if preferred_lines:
+        restricted = origin_lines & preferred_lines
+        if restricted:   # only restrict if preferred line actually serves this station
+            origin_lines = restricted
 
     # heap entries: (cost_sec, station_id, lines_on, path)
     pq: list = [(initial_wait_sec, origin_id, origin_lines, [origin_id])]
@@ -165,6 +170,7 @@ class TravelTimeOut(BaseModel):
     wait_minutes: int
     total_minutes: int
     live: bool
+    line_departures: dict = {}   # {line: {"minutes": int, "live": bool}}
 
 
 class PlanRequest(BaseModel):
@@ -172,6 +178,7 @@ class PlanRequest(BaseModel):
     origin_lon: float
     dest_lat: float
     dest_lon: float
+    preferred_line: str | None = None
 
 
 class PlanOut(BaseModel):
@@ -273,7 +280,8 @@ async def plan_trip(req: PlanRequest):
 
             d_walk_sec = _walk_seconds(d_km)
 
-            result = _dijkstra(o_station["id"], d_station["id"], _graph_cache, o_wait_sec)
+            pref = frozenset([req.preferred_line]) if req.preferred_line else None
+            result = _dijkstra(o_station["id"], d_station["id"], _graph_cache, o_wait_sec, pref)
             if result is None:
                 continue
 
@@ -298,6 +306,12 @@ async def plan_trip(req: PlanRequest):
         raise HTTPException(status_code=404, detail="No route found")
 
     r = best_result
+
+    # Fetch per-line departure times for the chosen origin station
+    line_dep = await departure_times_by_line(
+        r["o_station"]["id"],
+        r["o_station"].get("lines", [])
+    )
     path = r["path"]
     route_stations = [StationOut(**station_map[sid]) for sid in path if sid in station_map]
 
@@ -320,6 +334,7 @@ async def plan_trip(req: PlanRequest):
             wait_minutes=wait_min,
             total_minutes=total_min,
             live=r["o_live"],
+            line_departures=line_dep,
         ),
     )
 

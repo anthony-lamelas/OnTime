@@ -160,9 +160,34 @@ function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange
   )
 }
 
-function StationChip({ station, label, walkKm, color }) {
+function LineDepartureRow({ line, minutes, isLive, isSelected, onSelect }) {
+  return (
+    <div
+      className={`${styles.depRow} ${isSelected ? styles.depRowSelected : ''}`}
+      onClick={() => onSelect(line)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onSelect(line)}
+      aria-pressed={isSelected}
+    >
+      <LineBadge line={line} />
+      <span className={isLive ? styles.depTime : styles.depTimeEst}>
+        {isLive ? `${minutes} min` : `~${minutes} min`}
+      </span>
+      <span className={isSelected ? styles.depSelected : styles.depSelect}>
+        {isSelected ? 'Selected ✓' : 'Select'}
+      </span>
+    </div>
+  )
+}
+
+function StationChip({ station, label, walkKm, color, lineDepartures, selectedLine, onLineSelect }) {
   if (!station) return null
   const walkMin = Math.max(1, Math.round((walkKm / 5) * 60))
+  const depEntries = lineDepartures
+    ? Object.entries(lineDepartures).sort(([, a], [, b]) => a.minutes - b.minutes)
+    : null
+
   return (
     <div className={styles.stationChip}>
       <div className={styles.chipDot} style={{ background: color }} />
@@ -170,17 +195,33 @@ function StationChip({ station, label, walkKm, color }) {
         <span className={styles.chipLabel}>{label}</span>
         <span className={styles.chipName}>{station.name}</span>
         <div className={styles.chipMeta}>
-          <span className={styles.chipWalk}>{walkMin} min walk</span>
-          <span className={styles.chipLines}>
-            {station.lines.slice(0, 6).map(l => <LineBadge key={l} line={l} />)}
-          </span>
+          <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
+          {!depEntries && (
+            <span className={styles.chipLines}>
+              {station.lines.slice(0, 6).map(l => <LineBadge key={l} line={l} />)}
+            </span>
+          )}
         </div>
+        {depEntries && (
+          <div className={styles.depList}>
+            {depEntries.map(([line, { minutes, live }]) => (
+              <LineDepartureRow
+                key={line}
+                line={line}
+                minutes={minutes}
+                isLive={live}
+                isSelected={selectedLine === line}
+                onSelect={onLineSelect}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function TravelCard({ plan }) {
+function TravelCard({ plan, selectedLine }) {
   if (!plan) return null
   const { travel_time: tt, origin_walk_km, dest_walk_km } = plan
   if (!tt || tt.stops === 0) return null
@@ -207,7 +248,8 @@ function TravelCard({ plan }) {
           <span className={styles.travelIcon}>Wait</span>
           <span>{tt.wait_minutes ?? 5} min</span>
           <span className={styles.travelStepLabel}>
-            wait {tt.live ? <span className={styles.livePill}>live</span> : '(est.)'}
+            {selectedLine ? `wait for ${selectedLine} ` : 'wait '}
+            {tt.live ? <span className={styles.livePill}>live</span> : '(est.)'}
           </span>
         </div>
         <div className={styles.travelDivider} />
@@ -231,6 +273,7 @@ export default function TripPlanner({
   origin, locating, locError, destination, plan, planning,
   onOriginChange, onDestChange, onRequestGPS, onReset,
   isLoggedIn, setIsLoggedIn, setView,
+  selectedLine, onLineSelect,
 }) {
   return (
     <aside className={styles.panel}>
@@ -269,6 +312,9 @@ export default function TripPlanner({
             label="Nearest station to you"
             walkKm={plan.origin_walk_km}
             color="#4f6ef7"
+            lineDepartures={plan.travel_time?.line_departures}
+            selectedLine={selectedLine}
+            onLineSelect={onLineSelect}
           />
           <StationChip
             station={plan.dest_station}
@@ -294,7 +340,7 @@ export default function TripPlanner({
 
       {/* Travel time card */}
       {!planning && plan?.route.found && (
-        <TravelCard plan={plan} />
+        <TravelCard plan={plan} selectedLine={selectedLine} />
       )}
 
       {/* Reset */}

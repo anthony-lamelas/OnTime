@@ -453,3 +453,60 @@
   color: var(--text);
   border-color: var(--accent);
 }
+
+/* Per-line departure rows */
+.depList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.depRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+
+.depRow:hover {
+  background: var(--surface2);
+  border-color: var(--accent);
+}
+
+.depRowSelected {
+  background: rgba(79, 110, 247, 0.12);
+  border-color: var(--accent);
+}
+
+.depTime {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.depTimeEst {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.depSelect {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.depSelected {
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 700;
+}

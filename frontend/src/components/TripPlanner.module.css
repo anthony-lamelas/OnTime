@@ -294,15 +294,34 @@
 .dropdownItem {
   padding: 10px 14px;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   border-bottom: 1px solid var(--border);
   transition: background 0.1s;
 }
 
 .dropdownItem:last-child { border-bottom: none; }
 .dropdownItem:hover { background: var(--surface2); }
+
+.dropdownRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.placeIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+
+.placeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
 
 .placeName {
   font-size: 13px;
@@ -316,6 +335,28 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.placeCategory {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--accent);
+  background: rgba(79, 110, 247, 0.12);
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.searchSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
 }
 
 /* Badge */

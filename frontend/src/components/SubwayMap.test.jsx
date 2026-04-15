@@ -30,7 +30,14 @@ vi.mock('react-map-gl', () => {
     Map: MockMap,
     Source: ({ children }) => children,
     Layer: () => null,
-    Marker: ({ children }) => <div data-testid="marker">{children}</div>,
+    Marker: ({ children, onClick }) => (
+      <div
+        data-testid="marker"
+        onClick={() => onClick?.({ originalEvent: { stopPropagation: () => {} } })}
+      >
+        {children}
+      </div>
+    ),
     NavigationControl: () => null,
     Popup: ({ children }) => <div data-testid="popup">{children}</div>,
   }
@@ -283,5 +290,147 @@ describe('SubwayMap component', () => {
     await triggerLongPress()
     fireEvent.click(screen.getByText('Dismiss'))
     expect(screen.queryByText('Dismiss')).not.toBeInTheDocument()
+  })
+})
+
+// ── Candidate location pins (multi-location search) ──────────────────────────
+
+const MCDONALDS_CANDIDATES = [
+  { id: 'poi.mc.1', name: "McDonald's", lat: 40.7088, lon: -74.0094, fullAddress: "McDonald's, 160 Broadway, New York, NY 10038", category: 'fast food restaurant' },
+  { id: 'poi.mc.2', name: "McDonald's", lat: 40.7551, lon: -73.9870, fullAddress: "McDonald's, 1407 Broadway, New York, NY 10018", category: 'fast food restaurant' },
+  { id: 'poi.mc.3', name: "McDonald's", lat: 40.7571, lon: -73.9929, fullAddress: "McDonald's, 637 8th Ave, New York, NY 10036",  category: 'fast food restaurant' },
+]
+
+const TRADER_JOES_CANDIDATES = [
+  { id: 'poi.tj.1', name: "Trader Joe's", lat: 40.7438, lon: -73.9960, fullAddress: "Trader Joe's, 675 6th Ave, New York, NY 10010", category: 'grocery store' },
+  { id: 'poi.tj.2', name: "Trader Joe's", lat: 40.7338, lon: -73.9882, fullAddress: "Trader Joe's, 142 E 14th St, New York, NY 10003", category: 'grocery store' },
+]
+
+const SHAKE_SHACK_CANDIDATES = [
+  { id: 'poi.ss.1', name: 'Shake Shack', lat: 40.7577, lon: -73.9921, fullAddress: 'Shake Shack, 691 8th Ave, New York, NY 10036', category: 'burger restaurant' },
+  { id: 'poi.ss.2', name: 'Shake Shack', lat: 40.7832, lon: -73.9793, fullAddress: 'Shake Shack, 366 Columbus Ave, New York, NY 10024', category: 'burger restaurant' },
+  { id: 'poi.ss.3', name: 'Shake Shack', lat: 40.7156, lon: -74.0133, fullAddress: 'Shake Shack, 215 Murray St, New York, NY 10282', category: 'burger restaurant' },
+]
+
+describe('SubwayMap — candidate location pins', () => {
+  const defaultProps = {
+    userLocation: null,
+    userStation: null,
+    destination: null,
+    destStation: null,
+    route: null,
+    onPinOrigin: vi.fn(),
+    onPinDestination: vi.fn(),
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ type: 'FeatureCollection', features: [] }),
+    })
+    vi.stubEnv('VITE_MAPBOX_TOKEN', '')
+  })
+
+  afterEach(() => { vi.useRealTimers() })
+
+  it('renders one marker per candidate location', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={MCDONALDS_CANDIDATES} />)
+    const markers = screen.getAllByTestId('marker')
+    // 3 candidate markers (no user/station/dest markers since those props are null)
+    expect(markers).toHaveLength(3)
+  })
+
+  it('renders correct number of markers for Trader Joe\'s (2 locations)', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={TRADER_JOES_CANDIDATES} />)
+    expect(screen.getAllByTestId('marker')).toHaveLength(2)
+  })
+
+  it('renders correct number of markers for Shake Shack (3 locations)', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={SHAKE_SHACK_CANDIDATES} />)
+    expect(screen.getAllByTestId('marker')).toHaveLength(3)
+  })
+
+  it('shows no candidate markers when candidateLocations is empty', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={[]} />)
+    expect(screen.queryAllByTestId('marker')).toHaveLength(0)
+  })
+
+  it('clicking a candidate marker shows its name in a popup', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={MCDONALDS_CANDIDATES} />)
+    const markers = screen.getAllByTestId('marker')
+    fireEvent.click(markers[0])
+    expect(screen.getByTestId('popup')).toBeInTheDocument()
+    expect(screen.getByText("McDonald's")).toBeInTheDocument()
+  })
+
+  it('popup shows the full address of the selected candidate', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={MCDONALDS_CANDIDATES} />)
+    fireEvent.click(screen.getAllByTestId('marker')[0])
+    expect(screen.getByText("McDonald's, 160 Broadway, New York, NY 10038")).toBeInTheDocument()
+  })
+
+  it('clicking "Go here" on a candidate calls onPinDestination with correct coordinates', () => {
+    const onPinDestination = vi.fn()
+    render(<SubwayMap {...defaultProps} candidateLocations={MCDONALDS_CANDIDATES} onPinDestination={onPinDestination} />)
+    fireEvent.click(screen.getAllByTestId('marker')[0])
+    fireEvent.click(screen.getByText('Go here'))
+    expect(onPinDestination).toHaveBeenCalledOnce()
+    expect(onPinDestination).toHaveBeenCalledWith(expect.objectContaining({
+      lat: MCDONALDS_CANDIDATES[0].lat,
+      lon: MCDONALDS_CANDIDATES[0].lon,
+      label: "McDonald's",
+    }))
+  })
+
+  it('clicking a different candidate updates the popup to the new location', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={SHAKE_SHACK_CANDIDATES} />)
+    const markers = screen.getAllByTestId('marker')
+
+    fireEvent.click(markers[0])
+    expect(screen.getByText('Shake Shack, 691 8th Ave, New York, NY 10036')).toBeInTheDocument()
+
+    fireEvent.click(markers[1])
+    expect(screen.getByText('Shake Shack, 366 Columbus Ave, New York, NY 10024')).toBeInTheDocument()
+    expect(screen.queryByText('Shake Shack, 691 8th Ave, New York, NY 10036')).not.toBeInTheDocument()
+  })
+
+  it('clicking Dismiss closes the candidate popup', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={TRADER_JOES_CANDIDATES} />)
+    fireEvent.click(screen.getAllByTestId('marker')[0])
+    expect(screen.getByTestId('popup')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Dismiss'))
+    expect(screen.queryByTestId('popup')).not.toBeInTheDocument()
+  })
+
+  it('popup closes and onPinDestination fires when "Go here" clicked on Trader Joe\'s', () => {
+    const onPinDestination = vi.fn()
+    render(<SubwayMap {...defaultProps} candidateLocations={TRADER_JOES_CANDIDATES} onPinDestination={onPinDestination} />)
+    fireEvent.click(screen.getAllByTestId('marker')[1])
+    fireEvent.click(screen.getByText('Go here'))
+    expect(onPinDestination).toHaveBeenCalledWith(expect.objectContaining({
+      lat: TRADER_JOES_CANDIDATES[1].lat,
+      lon: TRADER_JOES_CANDIDATES[1].lon,
+    }))
+    expect(screen.queryByTestId('popup')).not.toBeInTheDocument()
+  })
+
+  it('candidate markers render alongside user location and destination markers', () => {
+    render(
+      <SubwayMap
+        {...defaultProps}
+        userLocation={{ lat: 40.73, lon: -73.99, label: 'Me' }}
+        destination={{ lat: 40.75, lon: -73.97, name: 'GCT' }}
+        candidateLocations={MCDONALDS_CANDIDATES}
+      />
+    )
+    // 1 user + 1 dest + 3 candidates = 5 markers
+    expect(screen.getAllByTestId('marker')).toHaveLength(5)
+  })
+
+  it('no popup visible before any candidate is clicked', () => {
+    render(<SubwayMap {...defaultProps} candidateLocations={SHAKE_SHACK_CANDIDATES} />)
+    expect(screen.queryByTestId('popup')).not.toBeInTheDocument()
   })
 })

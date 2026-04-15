@@ -68,11 +68,12 @@ export function walkLineGeoJSON(from, to) {
 
 export default function SubwayMap({
   userLocation, userStation, destination, destStation, route,
-  onPinOrigin, onPinDestination,
+  onPinOrigin, onPinDestination, candidateLocations = [],
 }) {
   const mapRef = useRef(null)
   const [subwayLines, setSubwayLines] = useState(null)
   const [viewState, setViewState] = useState({ ...NYC_CENTER, zoom: 12, pitch: 0, bearing: 0 })
+  const [selectedCandidate, setSelectedCandidate] = useState(null)
 
   // Long-press state
   const timerRef = useRef(null)
@@ -120,6 +121,25 @@ export default function SubwayMap({
       } catch (e) { console.error('fitBounds failed:', e) }
     }
   }, [route])
+
+  // Fit map to all candidate locations when they change
+  useEffect(() => {
+    if (!candidateLocations.length || !mapRef.current) return
+    setSelectedCandidate(null)
+    if (candidateLocations.length === 1) {
+      mapRef.current.flyTo({ center: [candidateLocations[0].lon, candidateLocations[0].lat], zoom: 15, duration: 1000 })
+      return
+    }
+    const lons = candidateLocations.map(c => c.lon).filter(isFinite)
+    const lats = candidateLocations.map(c => c.lat).filter(isFinite)
+    if (lons.length < 2) return
+    try {
+      mapRef.current.fitBounds(
+        [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+        { padding: 80, duration: 1000, maxZoom: 15 }
+      )
+    } catch (e) { console.error('candidate fitBounds failed:', e) }
+  }, [candidateLocations])
 
   // ── Long-press detection ──────────────────────────────────────────────────
 
@@ -329,6 +349,61 @@ export default function SubwayMap({
           <Marker longitude={destStation.lon} latitude={destStation.lat} anchor="center">
             <div className={styles.stationMarker} style={{ borderColor: '#f97316' }} />
           </Marker>
+        )}
+
+        {/* Candidate location pins (shown during search) */}
+        {candidateLocations.map(c => {
+          const isSelected = selectedCandidate?.id === c.id
+          return (
+            <Marker
+              key={c.id}
+              longitude={c.lon}
+              latitude={c.lat}
+              anchor="bottom"
+              onClick={e => { e.originalEvent.stopPropagation(); setSelectedCandidate(c) }}
+            >
+              <div className={`${styles.candidatePin} ${isSelected ? styles.candidatePinActive : ''}`} />
+            </Marker>
+          )
+        })}
+
+        {/* Candidate popup */}
+        {selectedCandidate && (
+          <Popup
+            longitude={selectedCandidate.lon}
+            latitude={selectedCandidate.lat}
+            anchor="bottom"
+            offset={36}
+            closeButton={false}
+            closeOnClick={false}
+            className={styles.pinPopup}
+          >
+            <div className={styles.pinPopupContent}>
+              <p className={styles.pinPopupTitle}>{selectedCandidate.name}</p>
+              {selectedCandidate.fullAddress && (
+                <p className={styles.candidateAddr}>{selectedCandidate.fullAddress}</p>
+              )}
+              <div className={styles.pinPopupActions}>
+                <button
+                  className={`${styles.pinBtn} ${styles.pinBtnDest}`}
+                  onClick={() => {
+                    onPinDestination({
+                      lat: selectedCandidate.lat,
+                      lon: selectedCandidate.lon,
+                      name: selectedCandidate.fullAddress || selectedCandidate.name,
+                      label: selectedCandidate.name,
+                    })
+                    setSelectedCandidate(null)
+                  }}
+                >
+                  Go here
+                </button>
+              </div>
+              <button className={styles.pinDismiss} onClick={() => setSelectedCandidate(null)}>
+                Dismiss
+              </button>
+            </div>
+          </Popup>
         )}
 
         {/* Dropped pin + popup */}

@@ -211,3 +211,34 @@
 }
 
 .pinDismiss:hover { color: #e8eaf6; }
+
+/* Candidate pins (multi-location search results) */
+.candidatePin {
+  width: 16px;
+  height: 16px;
+  background: #f59e0b;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 8px rgba(245,158,11,0.5);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.candidatePin:hover {
+  transform: rotate(-45deg) scale(1.2);
+  box-shadow: 0 4px 14px rgba(245,158,11,0.7);
+}
+
+.candidatePinActive {
+  width: 20px;
+  height: 20px;
+  box-shadow: 0 0 0 4px rgba(245,158,11,0.3), 0 4px 14px rgba(245,158,11,0.6);
+}
+
+.candidateAddr {
+  font-size: 11px;
+  color: #7b7f9e;
+  margin: -6px 0 0;
+  line-height: 1.4;
+}

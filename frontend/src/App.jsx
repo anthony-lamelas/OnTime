@@ -18,6 +18,9 @@ export default function App() {
   // Destination: { lat, lon, name }
   const [destination, setDestination] = useState(null)
 
+  // Candidate locations shown as map pins during search
+  const [candidateLocations, setCandidateLocations] = useState([])
+
   // Plan result from backend
   const [plan, setPlan] = useState(null)   // PlanOut
   const [planning, setPlanning] = useState(false)
@@ -85,12 +88,14 @@ export default function App() {
     setDestination(dest)
     setPlan(null)
     setSelectedLine(null)
+    setCandidateLocations([])
   }, [])
 
   const handleReset = useCallback(() => {
     setDestination(null)
     setPlan(null)
     setSelectedLine(null)
+    setCandidateLocations([])
   }, [])
 
   // Toggle: clicking the same line again deselects (reverts to auto-route)
@@ -126,6 +131,7 @@ export default function App() {
           setView={setCurrentView}
           selectedLine={selectedLine}
           onLineSelect={handleLineSelect}
+          onCandidatesChange={setCandidateLocations}
         />
       )}
       {currentView === 'favorites' && (
@@ -168,6 +174,7 @@ export default function App() {
         route={plan?.route}
         onPinOrigin={handlePinOrigin}
         onPinDestination={handlePinDestination}
+        candidateLocations={candidateLocations}
       />
     </div>
   )

@@ -9,6 +9,11 @@ import styles from './App.module.css'
 export default function App() {
   const [currentView, setCurrentView] = useState('home')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [theme, setTheme] = useState('dark')
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   // Origin: { lat, lon, label } — either from GPS or user-typed
   const [origin, setOrigin] = useState(null)
@@ -175,6 +180,8 @@ export default function App() {
         onPinOrigin={handlePinOrigin}
         onPinDestination={handlePinDestination}
         candidateLocations={candidateLocations}
+        theme={theme}
+        onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
     </div>
   )

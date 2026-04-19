@@ -69,6 +69,7 @@ export function walkLineGeoJSON(from, to) {
 export default function SubwayMap({
   userLocation, userStation, destination, destStation, route,
   onPinOrigin, onPinDestination, candidateLocations = [],
+  theme, onThemeToggle
 }) {
   const mapRef = useRef(null)
   const [subwayLines, setSubwayLines] = useState(null)
@@ -254,7 +255,7 @@ export default function SubwayMap({
         onMove={e => setViewState(e.viewState)}
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        mapStyle="mapbox://styles/mapbox/dark-v11"
+        mapStyle={theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11'}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -264,17 +265,25 @@ export default function SubwayMap({
         dragPan={{ threshold: 10 }}
       >
         <NavigationControl position="top-right" />
+        
+        <button 
+          className={styles.themeToggle} 
+          onClick={onThemeToggle}
+          title="Toggle Light/Dark Mode"
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
 
         {/* Subway network background — ArcGIS track geometry, uniform dim color */}
         {subwayLines && (
           <Source id="subway-lines" type="geojson" data={subwayLines}>
             <Layer id="subway-lines-casing" type="line"
-              paint={{ 'line-color': '#000', 'line-width': 4, 'line-opacity': 0.4 }}
+              paint={{ 'line-color': theme === 'light' ? '#fff' : '#000', 'line-width': 4, 'line-opacity': 0.4 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             <Layer id="subway-lines-fill" type="line"
               paint={{
-                'line-color': '#4a4f6a',
+                'line-color': theme === 'light' ? '#cbd5e1' : '#4a4f6a',
                 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 2.5],
                 'line-opacity': 0.7,
               }}
@@ -309,7 +318,7 @@ export default function SubwayMap({
             />
             {/* Dark casing for contrast */}
             <Layer id="route-casing" type="line"
-              paint={{ 'line-color': '#0d1020', 'line-width': 9, 'line-opacity': 0.9 }}
+              paint={{ 'line-color': theme === 'light' ? '#fff' : '#0d1020', 'line-width': 9, 'line-opacity': 0.9 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             {/* Main route line */}

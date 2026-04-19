@@ -400,6 +400,7 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .travelTotal {
@@ -418,8 +419,11 @@
 }
 
 .travelTotalLabel {
-  font-size: 14px;
-  color: var(--text-muted);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  margin-left: 2px;
 }
 
 .travelBreakdown {
@@ -437,9 +441,9 @@
 }
 
 .travelIcon {
-  font-size: 16px;
-  width: 24px;
-  text-align: center;
+  font-size: 15px;
+  width: 40px;
+  text-align: left;
   flex-shrink: 0;
 }
 
@@ -479,20 +483,22 @@
 /* Reset */
 .resetBtn {
   margin: 12px 16px;
-  background: none;
-  border: 1px solid var(--border);
+  background: var(--accent);
+  border: 1px solid var(--accent);
   border-radius: 8px;
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 8px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 16px;
   cursor: pointer;
-  text-align: left;
-  transition: color 0.15s, border-color 0.15s;
+  text-align: center;
+  transition: opacity 0.15s, transform 0.15s;
+  flex-shrink: 0;
 }
 
 .resetBtn:hover {
-  color: var(--text);
-  border-color: var(--accent);
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 /* Per-line departure rows */

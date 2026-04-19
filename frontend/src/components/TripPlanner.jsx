@@ -317,35 +317,35 @@ function TravelCard({ plan, selectedLine }) {
     <div className={styles.travelCard}>
       <div className={styles.travelTotal}>
         <span className={styles.travelTotalNum}>{total}</span>
-        <span className={styles.travelTotalLabel}>min total</span>
+        <span className={styles.travelTotalLabel}>min</span>
       </div>
 
       <div className={styles.travelBreakdown}>
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Walk</span>
+          <span className={styles.travelIcon}>Walk </span>
           <span>{originWalkMin} min</span>
-          <span className={styles.travelStepLabel}>walk to station</span>
+          <span className={styles.travelStepLabel}>Walk to station</span>
         </div>
         <div className={styles.travelDivider} />
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Wait</span>
+          <span className={styles.travelIcon}>Wait </span>
           <span>{tt.wait_minutes ?? 5} min</span>
           <span className={styles.travelStepLabel}>
             {selectedLine ? `wait for ${selectedLine} ` : 'wait '}
-            {tt.live ? <span className={styles.livePill}>live</span> : '(est.)'}
+            {tt.live ? <span className={styles.livePill}>live</span> : '(estimated)'}
           </span>
         </div>
         <div className={styles.travelDivider} />
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Ride</span>
+          <span className={styles.travelIcon}>Ride </span>
           <span>{tt.transit_minutes} min</span>
           <span className={styles.travelStepLabel}>{tt.stops} stops</span>
         </div>
         <div className={styles.travelDivider} />
         <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Walk</span>
+          <span className={styles.travelIcon}>Walk </span>
           <span>{destWalkMin} min</span>
-          <span className={styles.travelStepLabel}>walk from station</span>
+          <span className={styles.travelStepLabel}>Walk from station</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from app.core.config import settings
 
 @dataclass
 class RouteSignals:
@@ -8,26 +9,17 @@ class RouteSignals:
     safety_score: float
     ml_confidence: float
 
-WEIGHTS = {
-    "eta": 0.35,
-    "delay_risk": 0.25,
-    "preference": 0.20,
-    "safety": 0.15,
-    "uncertainty_penalty": 0.05,
-}
-
-ETA_MAX_MINUTES = 120
 
 def score_route(signals: RouteSignals) -> float:
-    eta_norm = 1 - (signals.eta_minutes / ETA_MAX_MINUTES) # lower ETA = higher score
+    eta_norm = 1 - (signals.eta_minutes / settings.ETA_MAX_MINUTES) # lower ETA = higher score
     uncertainty_penalty = 1 - signals.ml_confidence
 
     return (
-        WEIGHTS["eta"] * eta_norm +
-        WEIGHTS["delay_risk"] * (1 - signals.delay_probability) +
-        WEIGHTS["preference"] * signals.preference_score +
-        WEIGHTS["safety"] * signals.safety_score -
-        WEIGHTS["uncertainty_penalty"] * uncertainty_penalty
+        settings.WEIGHT_ETA * eta_norm +
+        settings.WEIGHT_DELAY_RISK * (1 - signals.delay_probability) +
+        settings.WEIGHT_PREFERENCE * signals.preference_score +
+        settings.WEIGHT_SAFETY * signals.safety_score -
+        settings.WEIGHT_UNCERTAINTY_PENALTY * uncertainty_penalty
     )
 
 def rank_routes(candidates: list[dict], route_signals: list[RouteSignals]) -> list[dict]:

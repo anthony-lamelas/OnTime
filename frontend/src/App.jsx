@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import SubwayMap from './components/SubwayMap'
 import TripPlanner from './components/TripPlanner'
 import FavoritesPanel from './components/FavoritesPanel'
@@ -10,6 +10,29 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [theme, setTheme] = useState('dark')
+  const [sidebarWidth, setSidebarWidth] = useState(340)
+  const dragging = useRef(false)
+
+  const handleResizeStart = useCallback((e) => {
+    dragging.current = true
+    e.preventDefault()
+
+    const onMove = (e) => {
+      if (!dragging.current) return
+      setSidebarWidth(Math.min(Math.max(e.clientX, 220), 640))
+    }
+    const onUp = () => {
+      dragging.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -129,6 +152,7 @@ export default function App() {
 
   return (
     <div className={styles.layout}>
+      <div className={styles.sidebar} style={{ width: sidebarWidth }}>
       {currentView === 'home' && (
         <TripPlanner
           origin={origin}
@@ -181,6 +205,10 @@ export default function App() {
           setIsLoggedIn={setIsLoggedIn}
         />
       )}
+      </div>
+      <div className={styles.resizeHandle} onMouseDown={handleResizeStart}>
+        <div className={styles.resizeBar} />
+      </div>
       <SubwayMap
         userLocation={origin}
         userStation={plan?.origin_station}

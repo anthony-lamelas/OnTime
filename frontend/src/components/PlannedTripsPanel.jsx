@@ -45,6 +45,12 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
     const token = localStorage.getItem('token')
     if (!token) return
 
+    const tripDateTime = new Date(`${formData.date}T${formData.time}`)
+    if (tripDateTime < new Date()) {
+      alert("You cannot schedule a trip in the past.")
+      return
+    }
+
     if (!formData.origin || !formData.destination) {
       alert("Please select valid locations from the dropdown searches.")
       return
@@ -93,6 +99,24 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
       if (res.ok) setTrips(trips.filter(t => t.id !== id))
     } catch (err) { console.error(err) }
   }
+
+  const renderTripCard = (trip, isPast) => (
+    <div key={trip.id} className={ptStyles.card} style={isPast ? { opacity: 0.6 } : {}} onClick={() => handleTripClick(trip)}>
+      <div className={ptStyles.cardHeader}>
+        <div className={ptStyles.cardTime}>
+          {trip.date} at {trip.time}
+        </div>
+        <button type="button" className={ptStyles.deleteBtn} onClick={(e) => handleDeleteTrip(e, trip.id)}>×</button>
+      </div>
+      <div className={ptStyles.cardRoute}>
+        {trip.origin.label} → {trip.destination.label}
+      </div>
+    </div>
+  )
+
+  const now = new Date()
+  const upcomingTrips = trips.filter(trip => new Date(`${trip.date}T${trip.time}`) >= now)
+  const pastTrips = trips.filter(trip => new Date(`${trip.date}T${trip.time}`) < now)
 
   return (
     <aside className={styles.panel}>
@@ -152,20 +176,15 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
           </form>
         ) : (
           <div className={ptStyles.tripList}>
-            {trips.length === 0 && <div className={ptStyles.empty}>No trips planned.</div>}
-            {trips.map(trip => (
-              <div key={trip.id} className={ptStyles.card} onClick={() => handleTripClick(trip)}>
-                <div className={ptStyles.cardHeader}>
-                  <div className={ptStyles.cardTime}>
-                    {trip.date} at {trip.time}
-                  </div>
-                  <button type="button" className={ptStyles.deleteBtn} onClick={(e) => handleDeleteTrip(e, trip.id)}>×</button>
-                </div>
-                <div className={ptStyles.cardRoute}>
-                  {trip.origin.label} → {trip.destination.label}
-                </div>
-              </div>
-            ))}
+            {upcomingTrips.length === 0 && <div className={ptStyles.empty}>No upcoming trips planned.</div>}
+            {upcomingTrips.map(trip => renderTripCard(trip, false))}
+
+            {pastTrips.length > 0 && (
+              <>
+                <h3 className={ptStyles.subtitle} style={{ marginTop: '24px' }}>Past Trips</h3>
+                {pastTrips.map(trip => renderTripCard(trip, true))}
+              </>
+            )}
           </div>
         )}
       </div>

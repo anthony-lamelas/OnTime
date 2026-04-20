@@ -102,6 +102,7 @@ async def get_favorite_locations(
 
 @router.delete("/routes/{route_id}")
 async def delete_favorite_route(
+    *,
     db = Depends(deps.get_db),
     current_user = Depends(deps.get_current_user),
     route_id: int,
@@ -116,6 +117,7 @@ async def delete_favorite_route(
 
 @router.delete("/locations/{location_id}")
 async def delete_favorite_location(
+    *,
     db = Depends(deps.get_db),
     current_user = Depends(deps.get_current_user),
     location_id: int,

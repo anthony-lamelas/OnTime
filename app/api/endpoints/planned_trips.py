@@ -58,6 +58,7 @@ async def get_planned_trips(
 
 @router.delete("/{trip_id}")
 async def delete_planned_trip(
+    *,
     db = Depends(deps.get_db),
     current_user = Depends(deps.get_current_user),
     trip_id: int,

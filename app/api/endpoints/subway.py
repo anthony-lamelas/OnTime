@@ -36,7 +36,7 @@ MAX_ORIGIN_CANDIDATES = 6    # max walkable origin stations to evaluate
 MAX_DEST_CANDIDATES   = 5
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+
 
 def _load_stations() -> list[dict]:
     global _stations_cache, _graph_cache
@@ -49,7 +49,7 @@ def _load_stations() -> list[dict]:
     return _stations_cache
 
 
-# ── Geometry ──────────────────────────────────────────────────────────────────
+
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
@@ -79,7 +79,7 @@ def _stations_within(lat: float, lon: float, max_km: float,
     return result
 
 
-# ── Dijkstra ──────────────────────────────────────────────────────────────────
+
 
 def _dijkstra(
     origin_id: str,
@@ -148,49 +148,12 @@ def _dijkstra(
     return None  # no path
 
 
-# ── API models ────────────────────────────────────────────────────────────────
-
-class StationOut(BaseModel):
-    id: str
-    name: str
-    lines: list[str]
-    lat: Optional[float]
-    lon: Optional[float]
 
 
-class RouteOut(BaseModel):
-    stations: list[StationOut]
-    total_stops: int
-    found: bool
+from app.contracts.subway import StationOut, RouteOut, TravelTimeOut, PlanRequest, PlanOut
 
 
-class TravelTimeOut(BaseModel):
-    stops: int
-    transit_minutes: int
-    wait_minutes: int
-    total_minutes: int
-    live: bool
-    line_departures: dict = {}   # {line: {"minutes": int, "live": bool}}
 
-
-class PlanRequest(BaseModel):
-    origin_lat: float
-    origin_lon: float
-    dest_lat: float
-    dest_lon: float
-    preferred_line: str | None = None
-
-
-class PlanOut(BaseModel):
-    origin_station: StationOut
-    dest_station: StationOut
-    origin_walk_km: float
-    dest_walk_km: float
-    route: RouteOut
-    travel_time: TravelTimeOut
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/stations", response_model=list[StationOut])
 def get_stations():

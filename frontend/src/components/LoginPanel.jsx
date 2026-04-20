@@ -56,6 +56,11 @@ export default function LoginPanel({ setView, isLoggedIn, setIsLoggedIn }) {
           body: formData.toString()
         })
         if (!loginRes.ok) throw new Error('Registration succeeded, but auto-login failed')
+        const data = await loginRes.json()
+        localStorage.setItem('token', data.access_token)
+      } else {
+        const data = await res.json()
+        localStorage.setItem('token', data.access_token)
       }
 
       setIsLoggedIn(true)
@@ -126,7 +131,11 @@ export default function LoginPanel({ setView, isLoggedIn, setIsLoggedIn }) {
         isLoggedIn={isLoggedIn} 
         currentView="login" 
         setView={setView} 
-        onLogout={() => setIsLoggedIn(false)} 
+        onLogout={() => {
+          localStorage.removeItem('token')
+          setIsLoggedIn(false)
+          setView('home')
+        }} 
       />
     </aside>
   )

@@ -1,21 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import styles from './TripPlanner.module.css'
 import ptStyles from './PlannedTripsPanel.module.css'
 import SidebarNav from './SidebarNav'
 
-// Mock Data
-const INITIAL_PLANNED_TRIPS = [
-  {
-    id: 1,
-    origin: { lat: 40.7128, lon: -74.0060, name: '123 Fake St, New York', label: '123 Fake St' },
-    destination: { lat: 40.7580, lon: -73.9855, name: 'Times Square, New York', label: 'Times Square' },
-    date: '2026-05-15',
-    time: '08:30',
-  }
-]
-
 export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, onSelectRoute }) {
-  const [trips, setTrips] = useState(INITIAL_PLANNED_TRIPS)
+  const [trips, setTrips] = useState([])
   const [isAdding, setIsAdding] = useState(false)
   const [formData, setFormData] = useState({
     origin: '',
@@ -24,23 +13,64 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
     time: ''
   })
 
-  // To simulate selecting locations. In a full implementation, you would reuse PlaceSearch
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setTrips([])
+      return
+    }
+    const fetchTrips = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch('/api/planned_trips/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTrips(data)
+        }
+      } catch (e) {
+        console.error("Failed to load planned trips:", e)
+      }
+    }
+    fetchTrips()
+  }, [isLoggedIn])
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault()
-    const newTrip = {
-      id: Date.now(),
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const newTripPayload = {
       origin: { lat: 40.7128, lon: -74.0060, name: formData.origin, label: formData.origin },
       destination: { lat: 40.7580, lon: -73.9855, name: formData.destination, label: formData.destination },
       date: formData.date,
       time: formData.time,
     }
-    setTrips([newTrip, ...trips])
-    setIsAdding(false)
-    setFormData({ origin: '', destination: '', date: '', time: '' })
+
+    try {
+      const res = await fetch('/api/planned_trips/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newTripPayload)
+      })
+      if (res.ok) {
+        const trip = await res.json()
+        setTrips([trip, ...trips])
+        setIsAdding(false)
+        setFormData({ origin: '', destination: '', date: '', time: '' })
+      } else {
+        throw new Error("Failed to save trip")
+      }
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   const handleTripClick = (trip) => {
@@ -117,7 +147,11 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
         isLoggedIn={isLoggedIn} 
         currentView="plannedTrips" 
         setView={setView} 
-        onLogout={() => setIsLoggedIn(false)} 
+        onLogout={() => {
+          localStorage.removeItem('token')
+          setIsLoggedIn(false)
+          setView('home')
+        }} 
       />
     </aside>
   )

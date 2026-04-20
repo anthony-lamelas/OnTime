@@ -82,6 +82,7 @@ function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange
       {/* Custom address search */}
       {mode === 'custom' && (
         <PlaceSearch
+          value={typeof origin?.name === 'string' ? origin.name : (typeof origin?.label === 'string' ? origin.label : '')}
           placeholder="Enter your starting address…"
           userLocation={null}
           onSelect={onOriginChange}
@@ -229,6 +230,7 @@ export default function TripPlanner({
       <div className={styles.destSection}>
         <div className={styles.destLabel}>Where to?</div>
         <PlaceSearch
+          value={destination?.name || destination?.label || ''}
           placeholder="Search destination…"
           userLocation={origin}
           onSelect={onDestChange}

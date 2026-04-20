@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import styles from './PlaceSearch.module.css'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
@@ -40,6 +40,10 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
   const [retrieving, setRetrieving] = useState(false)
   const debounceRef = useRef(null)
   const sessionTokenRef = useRef(generateUUID())
+
+  useEffect(() => {
+    setQuery(value || '')
+  }, [value])
 
   const search = useCallback(async (q) => {
     if (!q.trim() || !MAPBOX_TOKEN) {

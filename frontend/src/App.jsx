@@ -8,7 +8,7 @@ import styles from './App.module.css'
 
 export default function App() {
   const [currentView, setCurrentView] = useState('home')
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('token'))
   const [theme, setTheme] = useState('dark')
   const [sidebarWidth, setSidebarWidth] = useState(340)
   const dragging = useRef(false)

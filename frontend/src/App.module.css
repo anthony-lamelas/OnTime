@@ -4,3 +4,38 @@
   height: 100dvh;
   overflow: hidden;
 }
+
+.sidebar {
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+  min-width: 220px;
+  max-width: 640px;
+}
+
+.resizeHandle {
+  width: 8px;
+  flex-shrink: 0;
+  height: 100%;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: transparent;
+}
+
+.resizeHandle:hover .resizeBar,
+.resizeHandle:active .resizeBar {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.resizeBar {
+  width: 3px;
+  height: 48px;
+  border-radius: 9999px;
+  background: var(--border);
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}

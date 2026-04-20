@@ -11,7 +11,7 @@ from app.db.session import init_db_pool, close_db_pool
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize the database schema on startup
-    init_db()
+    await init_db()
     # Spin up asyncpg connection array
     await init_db_pool()
     yield

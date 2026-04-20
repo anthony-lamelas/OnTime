@@ -107,6 +107,27 @@ npm run dev
 You can view the full application (with the subway map) by navigating to [http://localhost:5173/](http://localhost:5173/) or the port specified in your terminal output.
 
 ---
+### 5. Testing
+
+#### Backend
+
+```bash
+# Run unit and integration tests (must be inside of virtual environment)
+pytest tests/
+```
+
+#### Frontend
+
+```bash
+# Run unit tests
+cd frontend
+npm run test
+
+# Run end-to-end tests
+cd frontend
+npm run test:e2e
+```
+
 
 ## Exploring the API Documentation
 

@@ -159,6 +159,9 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
             </form>
           )}
 
+          {!isAddingRoute && routes.length === 0 && (
+            <div className={favStyles.empty}>No favorite routes saved.</div>
+          )}
           {!isAddingRoute && routes.map(route => (
             <div key={route.id} className={favStyles.card} onClick={() => handleRouteClick(route)}>
               <div className={favStyles.cardTitle}>{route.name}</div>
@@ -192,6 +195,9 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
             </form>
           )}
 
+          {!isAddingLocation && locations.length === 0 && (
+            <div className={favStyles.empty}>No favorite locations saved.</div>
+          )}
           {!isAddingLocation && locations.map(loc => (
             <div key={loc.id} className={favStyles.card} onClick={() => handleLocationClick(loc)}>
               <div className={favStyles.cardTitle}>{loc.name}</div>

@@ -9,3 +9,4 @@ threadpoolctl==3.6.0
 numpy==1.26.4
 pandas==2.3.0
 pyarrow==16.1.0
+asyncpg==0.30.0

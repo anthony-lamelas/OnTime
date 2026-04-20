@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import styles from './TripPlanner.module.css'
 import favStyles from './FavoritesPanel.module.css'
 import SidebarNav from './SidebarNav'
+import PlaceSearch from './PlaceSearch'
 
 export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onSelectRoute, onSelectLocation }) {
   const [routes, setRoutes] = useState([])
@@ -10,8 +11,8 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
   const [isAddingRoute, setIsAddingRoute] = useState(false)
   const [isAddingLocation, setIsAddingLocation] = useState(false)
   
-  const [routeForm, setRouteForm] = useState({ name: '', origin: '', destination: '' })
-  const [locationForm, setLocationForm] = useState({ name: '', location: '' })
+  const [routeForm, setRouteForm] = useState({ name: '', origin: null, destination: null })
+  const [locationForm, setLocationForm] = useState({ name: '', location: null })
 
   const fetchFavorites = async () => {
     const token = localStorage.getItem('token')
@@ -60,10 +61,14 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
     if (!token) return
 
     try {
+      if (!routeForm.origin || !routeForm.destination) {
+        alert("Please select valid locations from the dropdown searches.")
+        return
+      }
       const payload = {
         name: routeForm.name || 'Custom Route',
-        origin: { lat: 40.7128, lon: -74.0060, name: routeForm.origin, label: routeForm.origin },
-        destination: { lat: 40.7580, lon: -73.9855, name: routeForm.destination, label: routeForm.destination }
+        origin: routeForm.origin,
+        destination: routeForm.destination
       }
       
       const res = await fetch('/api/favorites/routes', {
@@ -79,7 +84,7 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
       setRoutes([data, ...routes])
       
       setIsAddingRoute(false)
-      setRouteForm({ name: '', origin: '', destination: '' })
+      setRouteForm({ name: '', origin: null, destination: null })
     } catch (err) {
       console.error(err)
     }
@@ -91,9 +96,13 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
     if (!token) return
 
     try {
+      if (!locationForm.location) {
+        alert("Please select a valid location from the dropdown search.")
+        return
+      }
       const payload = {
         name: locationForm.name || 'Custom Location',
-        location: { lat: 40.7128, lon: -74.0060, name: locationForm.location, label: locationForm.location }
+        location: locationForm.location
       }
       
       const res = await fetch('/api/favorites/locations', {
@@ -109,7 +118,7 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
       setLocations([data, ...locations])
       
       setIsAddingLocation(false)
-      setLocationForm({ name: '', location: '' })
+      setLocationForm({ name: '', location: null })
     } catch (err) {
       console.error(err)
     }
@@ -146,11 +155,19 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
               </div>
               <div className={favStyles.inputGroup}>
                 <label>Origin</label>
-                <input type="text" required value={routeForm.origin} onChange={e => setRouteForm({...routeForm, origin: e.target.value})} placeholder="Location" />
+                <PlaceSearch
+                  placeholder="Search starting point..."
+                  value={routeForm.origin?.name || ''}
+                  onSelect={sel => setRouteForm({ ...routeForm, origin: sel })}
+                />
               </div>
               <div className={favStyles.inputGroup}>
                 <label>Destination</label>
-                <input type="text" required value={routeForm.destination} onChange={e => setRouteForm({...routeForm, destination: e.target.value})} placeholder="Location" />
+                <PlaceSearch
+                  placeholder="Search destination..."
+                  value={routeForm.destination?.name || ''}
+                  onSelect={sel => setRouteForm({ ...routeForm, destination: sel })}
+                />
               </div>
               <div className={favStyles.formActions}>
                 <button type="button" className={favStyles.cancelBtn} onClick={() => setIsAddingRoute(false)}>Cancel</button>
@@ -186,7 +203,11 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
               </div>
               <div className={favStyles.inputGroup}>
                 <label>Address</label>
-                <input type="text" required value={locationForm.location} onChange={e => setLocationForm({...locationForm, location: e.target.value})} placeholder="Location" />
+                <PlaceSearch
+                  placeholder="Search address or place..."
+                  value={locationForm.location?.name || ''}
+                  onSelect={sel => setLocationForm({ ...locationForm, location: sel })}
+                />
               </div>
               <div className={favStyles.formActions}>
                 <button type="button" className={favStyles.cancelBtn} onClick={() => setIsAddingLocation(false)}>Cancel</button>

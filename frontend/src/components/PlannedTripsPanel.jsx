@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import styles from './TripPlanner.module.css'
 import ptStyles from './PlannedTripsPanel.module.css'
 import SidebarNav from './SidebarNav'
+import PlaceSearch from './PlaceSearch'
 
 export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, onSelectRoute }) {
   const [trips, setTrips] = useState([])
   const [isAdding, setIsAdding] = useState(false)
   const [formData, setFormData] = useState({
-    origin: '',
-    destination: '',
+    origin: null,
+    destination: null,
     date: '',
     time: ''
   })
@@ -44,9 +45,14 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
     const token = localStorage.getItem('token')
     if (!token) return
 
+    if (!formData.origin || !formData.destination) {
+      alert("Please select valid locations from the dropdown searches.")
+      return
+    }
+
     const newTripPayload = {
-      origin: { lat: 40.7128, lon: -74.0060, name: formData.origin, label: formData.origin },
-      destination: { lat: 40.7580, lon: -73.9855, name: formData.destination, label: formData.destination },
+      origin: formData.origin,
+      destination: formData.destination,
       date: formData.date,
       time: formData.time,
     }
@@ -64,7 +70,7 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
         const trip = await res.json()
         setTrips([trip, ...trips])
         setIsAdding(false)
-        setFormData({ origin: '', destination: '', date: '', time: '' })
+        setFormData({ origin: null, destination: null, date: '', time: '' })
       } else {
         throw new Error("Failed to save trip")
       }
@@ -105,11 +111,19 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
             <h3 className={ptStyles.subtitle}>New Trip</h3>
             <div className={ptStyles.inputGroup}>
               <label>Origin</label>
-              <input type="text" name="origin" required value={formData.origin} onChange={handleChange} placeholder="e.g. 123 Fake St"/>
+              <PlaceSearch
+                placeholder="Search starting point..."
+                value={formData.origin?.name || ''}
+                onSelect={sel => setFormData({ ...formData, origin: sel })}
+              />
             </div>
             <div className={ptStyles.inputGroup}>
               <label>Destination</label>
-              <input type="text" name="destination" required value={formData.destination} onChange={handleChange} placeholder="e.g. Times Square"/>
+              <PlaceSearch
+                placeholder="Search destination..."
+                value={formData.destination?.name || ''}
+                onSelect={sel => setFormData({ ...formData, destination: sel })}
+              />
             </div>
             <div className={ptStyles.row}>
               <div className={ptStyles.inputGroup}>

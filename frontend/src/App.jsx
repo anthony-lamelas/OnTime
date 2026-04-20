@@ -117,6 +117,16 @@ export default function App() {
     handleDestChange(loc)
   }, [handleDestChange])
 
+  // Reset GPS and routing on view switch
+  useEffect(() => {
+    if (currentView === 'favorites' || currentView === 'plannedTrips') {
+      requestGPS()
+      setDestination(null)
+      setSelectedLine(null)
+      setPlan(null)
+    }
+  }, [currentView, requestGPS])
+
   return (
     <div className={styles.layout}>
       {currentView === 'home' && (

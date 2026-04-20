@@ -1,0 +1,33 @@
+name: Automated Production Deployment (CI/CD)
+
+# This securely runs exclusively after the test suite finishes verifying the code
+on:
+  workflow_run:
+    workflows: ["Fullstack CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy Core React & Python Logic to EC2
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Executing Remote SSH Commands natively
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # The script we are executing natively across the cloud
+          script: |
+            cd OnTime
+            
+            # Instantly Sync the codebase identically to Github Main Branch
+            git pull origin main
+            
+            # Spin up the containers (Native Caching securely limits CPU starvation)
+            docker compose -f docker-compose.prod.yml up -d --build

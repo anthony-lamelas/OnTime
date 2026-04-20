@@ -1,4 +1,4 @@
-name: Automated Production Deployment (CI/CD)
+name: Production Deployment
 
 # This securely runs exclusively after the test suite finishes verifying the code
 on:

@@ -55,3 +55,16 @@ async def get_planned_trips(
             time=row['trip_time']
         ) for row in trips
     ]
+
+@router.delete("/{trip_id}")
+async def delete_planned_trip(
+    db = Depends(deps.get_db),
+    current_user = Depends(deps.get_current_user),
+    trip_id: int,
+) -> Any:
+    """
+    Delete a planned trip
+    """
+    await db.execute("DELETE FROM planned_trips WHERE id = $1 AND user_id = $2", trip_id, current_user.id)
+    logger.info(f"User #{current_user.id} deleted planned trip: {trip_id}")
+    return {"message": "Planned trip deleted successfully"}

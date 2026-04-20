@@ -99,3 +99,30 @@ async def get_favorite_locations(
             location=row['location'] if isinstance(row['location'], dict) else json.loads(row['location']),
         ) for row in favorite_locations
     ]
+
+@router.delete("/routes/{route_id}")
+async def delete_favorite_route(
+    db = Depends(deps.get_db),
+    current_user = Depends(deps.get_current_user),
+    route_id: int,
+) -> Any:
+    """
+    Delete a favorite route
+    """
+    await db.execute("DELETE FROM favorite_routes WHERE id = $1 AND user_id = $2", route_id, current_user.id)
+    logger.info(f"User #{current_user.id} deleted favorite route: {route_id}")
+    return {"message": "Favorite route deleted successfully"}
+
+
+@router.delete("/locations/{location_id}")
+async def delete_favorite_location(
+    db = Depends(deps.get_db),
+    current_user = Depends(deps.get_current_user),
+    location_id: int,
+) -> Any:
+    """
+    Delete a favorite location
+    """
+    await db.execute("DELETE FROM favorite_locations WHERE id = $1 AND user_id = $2", location_id, current_user.id)
+    logger.info(f"User #{current_user.id} deleted favorite location: {location_id}")
+    return {"message": "Favorite location deleted successfully"}

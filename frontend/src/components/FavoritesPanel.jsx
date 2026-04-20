@@ -55,6 +55,26 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
     setView('home')
   }
 
+  const handleDeleteRoute = async (e, id) => {
+    e.stopPropagation()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`/api/favorites/routes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setRoutes(routes.filter(r => r.id !== id))
+    } catch (err) { console.error(err) }
+  }
+
+  const handleDeleteLocation = async (e, id) => {
+    e.stopPropagation()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`/api/favorites/locations/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setLocations(locations.filter(l => l.id !== id))
+    } catch (err) { console.error(err) }
+  }
+
   const handleAddRoute = async (e) => {
     e.preventDefault()
     const token = localStorage.getItem('token')
@@ -181,7 +201,10 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
           )}
           {!isAddingRoute && routes.map(route => (
             <div key={route.id} className={favStyles.card} onClick={() => handleRouteClick(route)}>
-              <div className={favStyles.cardTitle}>{route.name}</div>
+              <div className={favStyles.cardHeader}>
+                <div className={favStyles.cardTitle}>{route.name}</div>
+                <button type="button" className={favStyles.deleteBtn} onClick={(e) => handleDeleteRoute(e, route.id)}>×</button>
+              </div>
               <div className={favStyles.cardDesc}>
                 {route.origin.label} → {route.destination.label}
               </div>
@@ -221,7 +244,10 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
           )}
           {!isAddingLocation && locations.map(loc => (
             <div key={loc.id} className={favStyles.card} onClick={() => handleLocationClick(loc)}>
-              <div className={favStyles.cardTitle}>{loc.name}</div>
+              <div className={favStyles.cardHeader}>
+                <div className={favStyles.cardTitle}>{loc.name}</div>
+                <button type="button" className={favStyles.deleteBtn} onClick={(e) => handleDeleteLocation(e, loc.id)}>×</button>
+              </div>
               <div className={favStyles.cardDesc}>{loc.location.label}</div>
             </div>
           ))}

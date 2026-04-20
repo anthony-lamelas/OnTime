@@ -84,6 +84,16 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
     setView('home')
   }
 
+  const handleDeleteTrip = async (e, id) => {
+    e.stopPropagation()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`/api/planned_trips/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setTrips(trips.filter(t => t.id !== id))
+    } catch (err) { console.error(err) }
+  }
+
   return (
     <aside className={styles.panel}>
       <div className={styles.header}>
@@ -145,8 +155,11 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
             {trips.length === 0 && <div className={ptStyles.empty}>No trips planned.</div>}
             {trips.map(trip => (
               <div key={trip.id} className={ptStyles.card} onClick={() => handleTripClick(trip)}>
-                <div className={ptStyles.cardTime}>
-                  {trip.date} at {trip.time}
+                <div className={ptStyles.cardHeader}>
+                  <div className={ptStyles.cardTime}>
+                    {trip.date} at {trip.time}
+                  </div>
+                  <button type="button" className={ptStyles.deleteBtn} onClick={(e) => handleDeleteTrip(e, trip.id)}>×</button>
                 </div>
                 <div className={ptStyles.cardRoute}>
                   {trip.origin.label} → {trip.destination.label}

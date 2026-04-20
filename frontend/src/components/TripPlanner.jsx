@@ -286,7 +286,10 @@ export default function TripPlanner({
         isLoggedIn={isLoggedIn} 
         currentView="home" 
         setView={setView} 
-        onLogout={() => setIsLoggedIn(false)} 
+        onLogout={() => {
+          localStorage.removeItem('token')
+          setIsLoggedIn(false)
+        }} 
       />
     </aside>
   )

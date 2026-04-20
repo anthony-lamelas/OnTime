@@ -5,7 +5,7 @@ from tests.conftest import MOCK_USER_EMAIL, MOCK_USER_PASSWORD, MOCK_USER_ID, MO
 client = TestClient(app)
 
 def test_login_success(mock_db_session):
-    mock_db_session.fetchone.return_value = (MOCK_USER_ID, MOCK_USER_HASHED)
+    mock_db_session.fetchrow.return_value = {"id": MOCK_USER_ID, "hashed_password": MOCK_USER_HASHED}
     
     response = client.post(
         "/api/auth/login",
@@ -18,7 +18,7 @@ def test_login_success(mock_db_session):
 
 
 def test_login_incorrect_password(mock_db_session):
-    mock_db_session.fetchone.return_value = (MOCK_USER_ID, MOCK_USER_HASHED)
+    mock_db_session.fetchrow.return_value = {"id": MOCK_USER_ID, "hashed_password": MOCK_USER_HASHED}
     
     response = client.post(
         "/api/auth/login",

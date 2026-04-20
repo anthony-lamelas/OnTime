@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 from app.main import app
 from app.api import deps
@@ -13,14 +13,12 @@ MOCK_USER_HASHED = get_password_hash(MOCK_USER_PASSWORD)
 
 @pytest.fixture
 def mock_db_session():
-    """Fixture to mock the database session for endpoints."""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+    """Fixture to mock the database connection for endpoints."""
+    mock_conn = AsyncMock()
     
-    def get_mock_db():
+    async def get_mock_db():
         yield mock_conn
         
     app.dependency_overrides[deps.get_db] = get_mock_db
-    yield mock_cursor
+    yield mock_conn
     app.dependency_overrides.clear()

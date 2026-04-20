@@ -3,6 +3,11 @@ import styles from './PlaceSearch.module.css'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36)
+}
+
 const CATEGORY_ICONS = {
   restaurant: '🍽️', food: '🍽️', cafe: '☕', coffee: '☕',
   bar: '🍺', pizza: '🍕', fast_food: '🍔', bakery: '🥐',
@@ -34,7 +39,7 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
   const [open, setOpen] = useState(false)
   const [retrieving, setRetrieving] = useState(false)
   const debounceRef = useRef(null)
-  const sessionTokenRef = useRef(crypto.randomUUID())
+  const sessionTokenRef = useRef(generateUUID())
 
   const search = useCallback(async (q) => {
     if (!q.trim() || !MAPBOX_TOKEN) {
@@ -93,7 +98,7 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
         setQuery(displayName)
         onSelect({ name: displayName, lat, lon, label: suggestion.name })
         onCandidates?.([])
-        sessionTokenRef.current = crypto.randomUUID()
+        sessionTokenRef.current = generateUUID()
       }
     } catch (e) {
       console.error(e)
@@ -107,7 +112,7 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
     setResults([])
     onSelect(null)
     onCandidates?.([])
-    sessionTokenRef.current = crypto.randomUUID()
+    sessionTokenRef.current = generateUUID()
   }
 
   return (

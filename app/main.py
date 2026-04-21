@@ -27,7 +27,10 @@ app = FastAPI(
 # Set all CORS enabled origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this as we only want the actual frontend calling API
+    allow_origins=[
+        "http://localhost:5173",
+        "https://ontimenyc.duckdns.org"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -36,7 +36,10 @@ services:
       args:
         - VITE_MAPBOX_TOKEN=${VITE_MAPBOX_TOKEN}
     ports:
-      - "80:80" # Map to actual port 80 routing native browser IP targets safely!
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
     restart: unless-stopped

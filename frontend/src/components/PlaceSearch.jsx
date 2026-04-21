@@ -1,7 +1,12 @@
-import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import styles from './PlaceSearch.module.css'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36)
+}
 
 const CATEGORY_ICONS = {
   restaurant: '🍽️', food: '🍽️', cafe: '☕', coffee: '☕',
@@ -34,12 +39,16 @@ const PlaceSearch = forwardRef(function PlaceSearch({ placeholder, userLocation,
   const [open, setOpen] = useState(false)
   const [retrieving, setRetrieving] = useState(false)
   const debounceRef = useRef(null)
-  const sessionTokenRef = useRef(crypto.randomUUID())
+  const sessionTokenRef = useRef(generateUUID())
   const inputRef = useRef(null)
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
   }))
+
+  useEffect(() => {
+    setQuery(value || '')
+  }, [value])
 
   const search = useCallback(async (q) => {
     if (!q.trim() || !MAPBOX_TOKEN) {
@@ -98,7 +107,7 @@ const PlaceSearch = forwardRef(function PlaceSearch({ placeholder, userLocation,
         setQuery(displayName)
         onSelect({ name: displayName, lat, lon, label: suggestion.name })
         onCandidates?.([])
-        sessionTokenRef.current = crypto.randomUUID()
+        sessionTokenRef.current = generateUUID()
       }
     } catch (e) {
       console.error(e)
@@ -112,7 +121,7 @@ const PlaceSearch = forwardRef(function PlaceSearch({ placeholder, userLocation,
     setResults([])
     onSelect(null)
     onCandidates?.([])
-    sessionTokenRef.current = crypto.randomUUID()
+    sessionTokenRef.current = generateUUID()
   }
 
   return (

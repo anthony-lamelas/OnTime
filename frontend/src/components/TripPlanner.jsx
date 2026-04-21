@@ -82,7 +82,7 @@ function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange
       {/* Custom address search */}
       {mode === 'custom' && (
         <PlaceSearch
-          value={typeof origin?.name === 'string' ? origin.name : (typeof origin?.label === 'string' ? origin.label : '')}
+          value={origin?.name || origin?.label || ''}
           placeholder="Enter your starting address…"
           userLocation={null}
           onSelect={onOriginChange}

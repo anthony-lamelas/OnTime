@@ -10,7 +10,7 @@ const generateUUID = () => {
     crypto.getRandomValues(bytes)
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
   }
-  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36)
+  throw new Error('Secure UUID generation is unavailable in this environment')
 }
 
 const CATEGORY_ICONS = {

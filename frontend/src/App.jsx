@@ -180,6 +180,13 @@ export default function App() {
     handleDestChange(loc)
   }, [handleDestChange])
 
+  // On mobile, snap sheet up when a destination is selected so trip info is visible
+  useEffect(() => {
+    if (isMobile && destination) {
+      snapTo(snapPoints[1])
+    }
+  }, [destination])
+
   // Reset GPS and routing on view switch
   useEffect(() => {
     if (currentView === 'favorites' || currentView === 'plannedTrips') {
@@ -253,6 +260,8 @@ export default function App() {
       candidateLocations={candidateLocations}
       theme={theme}
       onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+      selectedLine={selectedLine}
+      lineDepartures={plan?.travel_time?.line_departures}
     />
   )
 

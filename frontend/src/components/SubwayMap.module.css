@@ -117,10 +117,10 @@
 .destPin {
   width: 18px;
   height: 18px;
-  background: #f97316;
+  background: #e8eaf6;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  border: 2px solid #fff;
+  border: 2px solid rgba(255,255,255,0.6);
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
@@ -241,6 +241,30 @@
   color: #7b7f9e;
   margin: -6px 0 0;
   line-height: 1.4;
+}
+
+/* Override Mapbox NavigationControl to match dark theme */
+.mapWrapper :global(.mapboxgl-ctrl-group) {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+}
+
+.mapWrapper :global(.mapboxgl-ctrl-group button) {
+  background: transparent;
+  color: var(--text);
+}
+
+.mapWrapper :global(.mapboxgl-ctrl-group button:hover) {
+  background: var(--surface2);
+}
+
+.mapWrapper :global(.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon) {
+  filter: invert(1);
+}
+
+.mapWrapper :global(.mapboxgl-ctrl-group button + button) {
+  border-top-color: var(--border);
 }
 
 /* theme toggle */

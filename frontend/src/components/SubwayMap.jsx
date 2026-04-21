@@ -7,6 +7,25 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const NYC_CENTER = { longitude: -73.9857, latitude: 40.7484 }
 const LONG_PRESS_MS = 550
 
+const LINE_COLORS = {
+  '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+  '4': '#00933C', '5': '#00933C', '6': '#00933C',
+  '7': '#B933AD',
+  'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+  'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+  'G': '#6CBE45',
+  'J': '#996633', 'Z': '#996633',
+  'L': '#A7A9AC',
+  'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+  'S': '#808183',
+}
+
+function getFastestLine(lineDepartures) {
+  if (!lineDepartures) return null
+  return Object.entries(lineDepartures)
+    .sort(([, a], [, b]) => a.minutes - b.minutes)[0]?.[0] ?? null
+}
+
 // ArcGIS endpoint (NYC OTI) — replaced the broken Socrata URL
 const ARCGIS_BASE =
   'https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Subway_view/FeatureServer/0/query'
@@ -69,8 +88,11 @@ export function walkLineGeoJSON(from, to) {
 export default function SubwayMap({
   userLocation, userStation, destination, destStation, route,
   onPinOrigin, onPinDestination, candidateLocations = [],
-  theme, onThemeToggle
+  theme, onThemeToggle,
+  selectedLine, lineDepartures,
 }) {
+  const activeLine = selectedLine ?? getFastestLine(lineDepartures)
+  const routeColor = LINE_COLORS[activeLine] ?? '#4f6ef7'
   const mapRef = useRef(null)
   const [subwayLines, setSubwayLines] = useState(null)
   const [viewState, setViewState] = useState({ ...NYC_CENTER, zoom: 13.5, pitch: 45, bearing: -10 })
@@ -483,7 +505,7 @@ export default function SubwayMap({
         {destToStation && (
           <Source id="walk-dest" type="geojson" data={destToStation}>
             <Layer id="walk-dest-line" type="line"
-              paint={{ 'line-color': '#f97316', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.8 }}
+              paint={{ 'line-color': '#4f6ef7', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.8 }}
             />
           </Source>
         )}
@@ -493,7 +515,7 @@ export default function SubwayMap({
           <Source id="route" type="geojson" data={routeGeoJSON}>
             {/* Outer glow */}
             <Layer id="route-glow" type="line"
-              paint={{ 'line-color': '#4f6ef7', 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 6 }}
+              paint={{ 'line-color': routeColor, 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 6 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             {/* Dark casing for contrast */}
@@ -503,7 +525,7 @@ export default function SubwayMap({
             />
             {/* Main route line */}
             <Layer id="route-line" type="line"
-              paint={{ 'line-color': '#4f6ef7', 'line-width': 5, 'line-opacity': 1 }}
+              paint={{ 'line-color': routeColor, 'line-width': 5, 'line-opacity': 1 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
           </Source>
@@ -522,7 +544,7 @@ export default function SubwayMap({
         {/* Origin station ring */}
         {userStation?.lon && (
           <Marker longitude={userStation.lon} latitude={userStation.lat} anchor="center">
-            <div className={styles.stationMarker} style={{ borderColor: '#4f6ef7' }} />
+            <div className={styles.stationMarker} style={{ borderColor: routeColor }} />
           </Marker>
         )}
 
@@ -536,7 +558,7 @@ export default function SubwayMap({
         {/* Dest station ring */}
         {destStation?.lon && destStation.id !== userStation?.id && (
           <Marker longitude={destStation.lon} latitude={destStation.lat} anchor="center">
-            <div className={styles.stationMarker} style={{ borderColor: '#f97316' }} />
+            <div className={styles.stationMarker} style={{ borderColor: '#e8eaf6' }} />
           </Marker>
         )}
 

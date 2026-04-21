@@ -9,6 +9,16 @@
   z-index: 10;
 }
 
+@media (max-width: 767px) {
+  .panel {
+    height: auto;
+    min-height: unset;
+    border-right: none;
+    overflow-y: visible;
+    background: transparent;
+  }
+}
+
 /* Header */
 .header {
   padding: 20px 20px 14px;

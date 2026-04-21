@@ -205,6 +205,7 @@ export default function TripPlanner({
   onOriginChange, onDestChange, onRequestGPS, onReset,
   isLoggedIn, setIsLoggedIn, setView,
   selectedLine, onLineSelect, onCandidatesChange,
+  destInputRef,
 }) {
   return (
     <aside className={styles.panel}>
@@ -229,6 +230,7 @@ export default function TripPlanner({
       <div className={styles.destSection}>
         <div className={styles.destLabel}>Where to?</div>
         <PlaceSearch
+          ref={destInputRef}
           placeholder="Search destination…"
           userLocation={origin}
           onSelect={onDestChange}

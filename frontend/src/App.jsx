@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import SubwayMap from './components/SubwayMap'
 import TripPlanner from './components/TripPlanner'
 import FavoritesPanel from './components/FavoritesPanel'
@@ -12,6 +12,46 @@ export default function App() {
   const [theme, setTheme] = useState('dark')
   const [sidebarWidth, setSidebarWidth] = useState(340)
   const dragging = useRef(false)
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  // Bottom sheet state (mobile only)
+  const PEEK = 88
+  const snapPoints = useMemo(() => [PEEK, Math.round(window.innerHeight * 0.55), window.innerHeight], [])
+  const [sheetHeight, setSheetHeight] = useState(PEEK)
+  const [isSheetDragging, setIsSheetDragging] = useState(false)
+  const sheetDragRef = useRef(null)
+  const destInputRef = useRef(null)
+
+  const snapTo = useCallback((height) => {
+    const closest = snapPoints.reduce((a, b) => Math.abs(b - height) < Math.abs(a - height) ? b : a)
+    setSheetHeight(closest)
+  }, [snapPoints])
+
+  const handleSheetDragStart = useCallback((e) => {
+    setIsSheetDragging(true)
+    sheetDragRef.current = { startY: e.touches[0].clientY, startHeight: sheetHeight }
+  }, [sheetHeight])
+
+  const handleSheetDragMove = useCallback((e) => {
+    if (!sheetDragRef.current) return
+    const dy = sheetDragRef.current.startY - e.touches[0].clientY
+    const next = Math.max(80, Math.min(window.innerHeight, sheetDragRef.current.startHeight + dy))
+    setSheetHeight(next)
+  }, [])
+
+  const handleSheetDragEnd = useCallback(() => {
+    setIsSheetDragging(false)
+    if (!sheetDragRef.current) return
+    snapTo(sheetHeight)
+    sheetDragRef.current = null
+  }, [sheetHeight, snapTo])
 
   const handleResizeStart = useCallback((e) => {
     dragging.current = true
@@ -150,9 +190,9 @@ export default function App() {
     }
   }, [currentView, requestGPS])
 
-  return (
-    <div className={styles.layout}>
-      <div className={styles.sidebar} style={{ width: sidebarWidth }}>
+  // Shared panel content rendered in both mobile and desktop
+  const panelContent = (
+    <>
       {currentView === 'home' && (
         <TripPlanner
           origin={origin}
@@ -171,6 +211,7 @@ export default function App() {
           selectedLine={selectedLine}
           onLineSelect={handleLineSelect}
           onCandidatesChange={setCandidateLocations}
+          destInputRef={destInputRef}
         />
       )}
       {currentView === 'favorites' && (
@@ -178,13 +219,8 @@ export default function App() {
           setView={setCurrentView}
           isLoggedIn={isLoggedIn}
           setIsLoggedIn={setIsLoggedIn}
-          onSelectRoute={(orig, dest) => {
-            setOrigin(orig)
-            setDestination(dest)
-          }}
-          onSelectLocation={(loc) => {
-            setDestination(loc)
-          }}
+          onSelectRoute={(orig, dest) => { setOrigin(orig); setDestination(dest) }}
+          onSelectLocation={(loc) => { setDestination(loc) }}
         />
       )}
       {currentView === 'plannedTrips' && (
@@ -192,10 +228,7 @@ export default function App() {
           setView={setCurrentView}
           isLoggedIn={isLoggedIn}
           setIsLoggedIn={setIsLoggedIn}
-          onSelectRoute={(orig, dest) => {
-            setOrigin(orig)
-            setDestination(dest)
-          }}
+          onSelectRoute={(orig, dest) => { setOrigin(orig); setDestination(dest) }}
         />
       )}
       {currentView === 'login' && (
@@ -205,22 +238,90 @@ export default function App() {
           setIsLoggedIn={setIsLoggedIn}
         />
       )}
+    </>
+  )
+
+  const mapEl = (
+    <SubwayMap
+      userLocation={origin}
+      userStation={plan?.origin_station}
+      destination={destination}
+      destStation={plan?.dest_station}
+      route={plan?.route}
+      onPinOrigin={handlePinOrigin}
+      onPinDestination={handlePinDestination}
+      candidateLocations={candidateLocations}
+      theme={theme}
+      onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+    />
+  )
+
+  if (isMobile) {
+    const isPeeked = sheetHeight <= PEEK + 20
+    return (
+      <div className={styles.mobileLayout}>
+        <div className={styles.mobileMapWrapper}>{mapEl}</div>
+
+        {/* Tap-to-dismiss overlay — visible map area above the sheet when expanded */}
+        {!isPeeked && (
+          <div
+            className={styles.mapTapOverlay}
+            style={{ bottom: sheetHeight }}
+            onClick={() => snapTo(PEEK)}
+          />
+        )}
+
+        {/* Bottom sheet */}
+        <div
+          className={styles.mobileSheet}
+          style={{
+            height: sheetHeight,
+            transition: isSheetDragging ? 'none' : 'height 0.3s cubic-bezier(0.34, 1.2, 0.64, 1)',
+          }}
+        >
+          {/* Drag handle — always draggable */}
+          <div
+            className={styles.sheetHandleBar}
+            onTouchStart={handleSheetDragStart}
+            onTouchMove={handleSheetDragMove}
+            onTouchEnd={handleSheetDragEnd}
+          >
+            <div className={styles.sheetPill} />
+          </div>
+
+          {isPeeked ? (
+            /* Compact Apple Maps-style search pill */
+            <button
+              className={styles.mobileSearchPill}
+              onClick={() => {
+                snapTo(snapPoints[1])
+                setTimeout(() => destInputRef.current?.focus(), 320)
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <span>Search OnTime</span>
+            </button>
+          ) : (
+            <div className={styles.sheetContent}>
+              {panelContent}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.layout}>
+      <div className={styles.sidebar} style={{ width: sidebarWidth }}>
+        {panelContent}
       </div>
       <div className={styles.resizeHandle} onMouseDown={handleResizeStart}>
         <div className={styles.resizeBar} />
       </div>
-      <SubwayMap
-        userLocation={origin}
-        userStation={plan?.origin_station}
-        destination={destination}
-        destStation={plan?.dest_station}
-        route={plan?.route}
-        onPinOrigin={handlePinOrigin}
-        onPinDestination={handlePinDestination}
-        candidateLocations={candidateLocations}
-        theme={theme}
-        onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-      />
+      {mapEl}
     </div>
   )
 }

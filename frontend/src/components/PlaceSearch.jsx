@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import styles from './PlaceSearch.module.css'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
@@ -28,13 +28,18 @@ function getCategoryIcon(poiCategories) {
   return '📍'
 }
 
-export default function PlaceSearch({ placeholder, userLocation, onSelect, value, onCandidates }) {
+const PlaceSearch = forwardRef(function PlaceSearch({ placeholder, userLocation, onSelect, value, onCandidates }, ref) {
   const [query, setQuery] = useState(value || '')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [retrieving, setRetrieving] = useState(false)
   const debounceRef = useRef(null)
   const sessionTokenRef = useRef(crypto.randomUUID())
+  const inputRef = useRef(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }))
 
   const search = useCallback(async (q) => {
     if (!q.trim() || !MAPBOX_TOKEN) {
@@ -115,6 +120,7 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
       <div className={styles.searchBox}>
         <span className={styles.searchIcon}>{retrieving ? '' : ''}</span>
         <input
+          ref={inputRef}
           className={styles.searchInput}
           type="text"
           placeholder={placeholder}
@@ -153,4 +159,6 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
       )}
     </div>
   )
-}
+})
+
+export default PlaceSearch

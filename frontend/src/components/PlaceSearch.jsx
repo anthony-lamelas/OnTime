@@ -1,11 +1,16 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import styles from './PlaceSearch.module.css'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
 const generateUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(16)
+    crypto.getRandomValues(bytes)
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+  }
+  throw new Error('Secure UUID generation is unavailable in this environment')
 }
 
 const CATEGORY_ICONS = {
@@ -33,13 +38,18 @@ function getCategoryIcon(poiCategories) {
   return '📍'
 }
 
-export default function PlaceSearch({ placeholder, userLocation, onSelect, value, onCandidates }) {
+const PlaceSearch = forwardRef(function PlaceSearch({ placeholder, userLocation, onSelect, value, onCandidates }, ref) {
   const [query, setQuery] = useState(value || '')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [retrieving, setRetrieving] = useState(false)
   const debounceRef = useRef(null)
   const sessionTokenRef = useRef(generateUUID())
+  const inputRef = useRef(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }))
 
   useEffect(() => {
     setQuery(value || '')
@@ -124,6 +134,7 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
       <div className={styles.searchBox}>
         <span className={styles.searchIcon}>{retrieving ? '' : ''}</span>
         <input
+          ref={inputRef}
           className={styles.searchInput}
           type="text"
           placeholder={placeholder}
@@ -162,4 +173,6 @@ export default function PlaceSearch({ placeholder, userLocation, onSelect, value
       )}
     </div>
   )
-}
+})
+
+export default PlaceSearch

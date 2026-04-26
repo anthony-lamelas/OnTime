@@ -264,44 +264,71 @@ function LineDepartureRow({ line, minutes, isLive, isSelected, onSelect }) {
   )
 }
 
-function StationChip({ station, label, walkKm, color, lineDepartures, selectedLine, onLineSelect }) {
-  if (!station) return null
-  const walkMin = Math.max(1, Math.round((walkKm / 5) * 60))
-  const depEntries = lineDepartures
-    ? Object.entries(lineDepartures).sort(([, a], [, b]) => a.minutes - b.minutes)
-    : null
+function StationChip({ station, label, walkKm, color, allRoutes, activePlan, onPlanSelect }) {
+    if (!station) return null
+    const walkMin = Math.max(1, Math.round((walkKm / 5) * 60))
 
-  return (
-    <div className={styles.stationChip}>
-      <div className={styles.chipDot} style={{ background: color }} />
-      <div className={styles.chipBody}>
-        <span className={styles.chipLabel}>{label}</span>
-        <span className={styles.chipName}>{station.name}</span>
-        <div className={styles.chipMeta}>
-          <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
-          {!depEntries && (
-            <span className={styles.chipLines}>
-              {station.lines.slice(0, 6).map(l => <LineBadge key={l} line={l} />)}
-            </span>
-          )}
+    // If we have ranked routes, show them grouped by line group
+    const hasRoutes = allRoutes?.length > 0
+
+    return (
+        <div className={styles.stationChip}>
+            <div className={styles.chipDot} style={{ background: color }} />
+            <div className={styles.chipBody}>
+                <span className={styles.chipLabel}>{label}</span>
+                {hasRoutes ? (
+                    // Show ranked route options grouped by line
+                    <div className={styles.rankedRoutes}>
+                        {allRoutes.map((route, i) => {
+                            const isActive = activePlan?.lines?.join() === route.lines?.join()
+                            const depLines = Object.keys(route.travel_time.line_departures || {})
+                            const soonest = depLines.length
+                                ? Math.min(...depLines.map(l => route.travel_time.line_departures[l].minutes))
+                                : route.travel_time.wait_minutes
+                            const isLive = Object.values(route.travel_time.line_departures || {}).some(d => d.live)
+
+                            return (
+                                <div
+                                    key={i}
+                                    className={`${styles.rankedRoute} ${isActive ? styles.rankedRouteActive : ''}`}
+                                    onClick={() => onPlanSelect(route)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={e => e.key === 'Enter' && onPlanSelect(route)}
+                                >
+                                    {/* Line badges */}
+                                    <div className={styles.routeLineBadges}>
+                                        {route.lines.map(l => <LineBadge key={l} line={l} />)}
+                                    </div>
+
+                                    {/* Wait time */}
+                                    <span className={isLive ? styles.depTime : styles.depTimeEst}>
+                                        {isLive ? `${soonest} min` : `~${soonest} min`}
+                                    </span>
+
+                                    {/* Total travel time */}
+                                    <span className={styles.routeTotalTime}>
+                                        {route.travel_time.total_minutes} min total
+                                    </span>
+
+                                    {/* Active indicator */}
+                                    {isActive && <span className={styles.routeActiveCheck}>✓</span>}
+                                </div>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    // Fallback: just show station name + walk time
+                    <>
+                        <span className={styles.chipName}>{station.name}</span>
+                        <div className={styles.chipMeta}>
+                            <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
-        {depEntries && (
-          <div className={styles.depList}>
-            {depEntries.map(([line, { minutes, live }]) => (
-              <LineDepartureRow
-                key={line}
-                line={line}
-                minutes={minutes}
-                isLive={live}
-                isSelected={selectedLine === line}
-                onSelect={onLineSelect}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
+    )
 }
 
 function TravelCard({ plan, selectedLine }) {
@@ -352,11 +379,34 @@ function TravelCard({ plan, selectedLine }) {
   )
 }
 
+function RouteOptionsList({ options, activePlan, onSelect }) {
+  if (!options || options.length <= 1) return null
+  return (
+    <div className={styles.routeOptions}>
+      {options.map((r, i) => (
+        <div
+          key={i}
+          className={`${styles.routeOption} ${activePlan === r ? styles.routeOptionActive : ''}`}
+          onClick={() => onSelect(r)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && onSelect(r)}
+        >
+          <span className={styles.routeOptionRank}>#{i + 1}</span>
+          <span className={styles.routeOptionTime}>{r.travel_time.total_minutes} min</span>
+          <span className={styles.routeOptionStops}>{r.travel_time.stops} stops</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function TripPlanner({
   origin, locating, locError, destination, plan, planning,
   onOriginChange, onDestChange, onRequestGPS, onReset,
   isLoggedIn, setIsLoggedIn, setView,
   selectedLine, onLineSelect, onCandidatesChange,
+  allRoutes, onPlanSelect,
 }) {
   return (
     <aside className={styles.panel}>
@@ -396,9 +446,9 @@ export default function TripPlanner({
             label="Nearest station to you"
             walkKm={plan.origin_walk_km}
             color="#4f6ef7"
-            lineDepartures={plan.travel_time?.line_departures}
-            selectedLine={selectedLine}
-            onLineSelect={onLineSelect}
+            allRoutes={allRoutes}
+            activePlan={plan}
+            onPlanSelect={onPlanSelect}
           />
           <StationChip
             station={plan.dest_station}

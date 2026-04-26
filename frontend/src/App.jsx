@@ -24,6 +24,7 @@ export default function App() {
   // Plan result from backend
   const [plan, setPlan] = useState(null)   // PlanOut
   const [planning, setPlanning] = useState(false)
+  const [allRoutes, setAllRoutes] = useState([])
 
   // Selected line at origin station (null = auto-pick fastest)
   const [selectedLine, setSelectedLine] = useState(null)
@@ -70,7 +71,14 @@ export default function App() {
       body: JSON.stringify(body),
     })
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
-      .then(setPlan)
+      .then(data => {
+        if (!data.routes?.length) {
+          setPlan({ route: { found: false } })
+          return
+        }
+        setPlan(data.routes[0])
+        setAllRoutes(data.routes)
+      })
       .catch((e) => {
         console.error(e)
         setPlan({ route: { found: false } })
@@ -89,6 +97,7 @@ export default function App() {
     setPlan(null)
     setSelectedLine(null)
     setCandidateLocations([])
+    setAllRoutes([])
   }, [])
 
   const handleReset = useCallback(() => {
@@ -96,7 +105,13 @@ export default function App() {
     setPlan(null)
     setSelectedLine(null)
     setCandidateLocations([])
+    setAllRoutes([])
   }, [])
+
+  const handlePlanSelect = useCallback((route) => {
+    setPlan(route)
+    setSelectedLine(null)
+}, [])
 
   // Toggle: clicking the same line again deselects (reverts to auto-route)
   const handleLineSelect = useCallback((line) => {
@@ -132,6 +147,8 @@ export default function App() {
           selectedLine={selectedLine}
           onLineSelect={handleLineSelect}
           onCandidatesChange={setCandidateLocations}
+          allRoutes={allRoutes}
+          onPlanSelect={handlePlanSelect}
         />
       )}
       {currentView === 'favorites' && (

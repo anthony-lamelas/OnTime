@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.mta.feeds import get_live_subway_data, next_departure_minutes, departure_times_by_line
+from app.services.route_scorer import RouteSignals, rank_routes
 
 router = APIRouter()
 
@@ -180,7 +181,6 @@ class PlanRequest(BaseModel):
     dest_lon: float
     preferred_line: str | None = None
 
-
 class PlanOut(BaseModel):
     origin_station: StationOut
     dest_station: StationOut
@@ -188,6 +188,19 @@ class PlanOut(BaseModel):
     dest_walk_km: float
     route: RouteOut
     travel_time: TravelTimeOut
+
+class RankedPlanOut(BaseModel):
+    origin_station: StationOut
+    dest_station: StationOut
+    origin_walk_km: float
+    dest_walk_km: float
+    route: RouteOut
+    travel_time: TravelTimeOut
+    score: float
+    lines: list[str]
+
+class PlansOut(BaseModel):
+    routes: list[RankedPlanOut]
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -197,7 +210,7 @@ def get_stations():
     return _load_stations()
 
 
-@router.post("/plan", response_model=PlanOut)
+@router.post("/plan", response_model=PlansOut)
 async def plan_trip(req: PlanRequest):
     """
     Find the fastest subway route from origin coords to destination coords.
@@ -259,83 +272,154 @@ async def plan_trip(req: PlanRequest):
         w = await next_departure_minutes(s["id"], s.get("lines", []))
         return w * 60 if w is not None else 300   # default 5 min
 
+    # Hardcoded NYC subway line groups (shared trunk lines)
+    LINE_GROUPS = [
+        frozenset(["A", "C", "E"]),
+        frozenset(["B", "D", "F", "M"]),
+        frozenset(["N", "Q", "R", "W"]),
+        frozenset(["1", "2", "3"]),
+        frozenset(["4", "5", "6"]),
+        frozenset(["J", "Z"]),
+        frozenset(["L"]),
+        frozenset(["G"]),
+        frozenset(["7"]),
+        frozenset(["S"]),
+    ]
+
+    def _get_line_group(line: str) -> frozenset:
+        """Return the group a line belongs to, or a singleton if not found."""
+        for group in LINE_GROUPS:
+            if line in group:
+                return group
+        return frozenset([line])
+
+    def _station_line_groups(station: dict) -> list[frozenset]:
+        """Return the unique line groups that serve this station."""
+        seen = []
+        for line in station.get("lines", []):
+            group = _get_line_group(line)
+            if group not in seen:
+                seen.append(group)
+        return seen
+
+    # Build origin waits as before
     wait_tasks = [_get_wait(s) for _, s in origin_candidates]
     wait_secs_list = await asyncio.gather(*wait_tasks)
     origin_waits = {
-        s["id"]: (wait_secs_list[i], wait_secs_list[i] < 300)  # (seconds, is_live)
+        s["id"]: (wait_secs_list[i], wait_secs_list[i] < 300)
         for i, (_, s) in enumerate(origin_candidates)
     }
 
-    # Evaluate every (origin, destination) pair
-    best_total   = float("inf")
-    best_result  = None
+    # Run Dijkstra once per line group across all origin/destination pairs
+    group_results: dict[frozenset, dict] = {}  # best result per line group
+
+    # If a specific line is preferred, restrict to just that group
+    forced_group = _get_line_group(req.preferred_line) if req.preferred_line else None
 
     for o_km, o_station in origin_candidates:
-        o_walk_sec           = _walk_seconds(o_km)
-        o_wait_sec, o_live   = origin_waits[o_station["id"]]
+        o_walk_sec = _walk_seconds(o_km)
+        o_wait_sec, o_live = origin_waits[o_station["id"]]
+        station_groups = _station_line_groups(o_station)
 
-        for d_km, d_station in dest_candidates:
-            if o_station["id"] == d_station["id"]:
+        for group in station_groups:
+            if forced_group and group != forced_group:
                 continue
 
-            d_walk_sec = _walk_seconds(d_km)
+            for d_km, d_station in dest_candidates:
+                if o_station["id"] == d_station["id"]:
+                    continue
 
-            pref = frozenset([req.preferred_line]) if req.preferred_line else None
-            result = _dijkstra(o_station["id"], d_station["id"], _graph_cache, o_wait_sec, pref)
-            if result is None:
-                continue
+                result = _dijkstra(
+                    o_station["id"], d_station["id"],
+                    _graph_cache, o_wait_sec,
+                    preferred_lines=group
+                )
+                if result is None:
+                    continue
 
-            path, transit_sec = result
-            total_sec = o_walk_sec + transit_sec + d_walk_sec
+                path, transit_sec = result
+                total_sec = o_walk_sec + transit_sec + _walk_seconds(d_km)
 
-            if total_sec < best_total:
-                best_total  = total_sec
-                best_result = {
-                    "o_station": o_station,
-                    "d_station": d_station,
-                    "o_walk_km": o_km,
-                    "d_walk_km": d_km,
-                    "o_wait_sec": o_wait_sec,
-                    "o_live": o_live,
-                    "path": path,
-                    "transit_sec": transit_sec,
-                    "total_sec": total_sec,
-                }
+                # Keep the best (lowest total_sec) result per group
+                existing = group_results.get(group)
+                if existing is None or total_sec < existing["total_sec"]:
+                    group_results[group] = {
+                        "group": group,
+                        "o_station": o_station,
+                        "d_station": d_station,
+                        "o_walk_km": o_km,
+                        "d_walk_km": d_km,
+                        "o_wait_sec": o_wait_sec,
+                        "o_live": o_live,
+                        "path": path,
+                        "transit_sec": transit_sec,
+                        "total_sec": total_sec,
+                    }
 
-    if best_result is None:
+    all_results = sorted(group_results.values(), key=lambda x: x["total_sec"])
+    top_results = all_results[:3]
+
+    if not top_results:
         raise HTTPException(status_code=404, detail="No route found")
 
-    r = best_result
+    # Build a PlanOut and RouteSignals for each candidate
+    candidates = []
+    candidate_lines = []
+    signals_list = []
 
-    # Fetch per-line departure times for the chosen origin station
-    line_dep = await departure_times_by_line(
-        r["o_station"]["id"],
-        r["o_station"].get("lines", [])
+    for r in top_results:
+        line_dep = await departure_times_by_line(
+            r["o_station"]["id"],
+            r["o_station"].get("lines", [])
+        )
+        path = r["path"]
+        route_stations = [
+            StationOut(**station_map[sid]) for sid in path if sid in station_map
+        ]
+        stops       = max(0, len(path) - 1)
+        wait_min    = round(r["o_wait_sec"] / 60)
+        transit_min = max(1, round((r["transit_sec"] - r["o_wait_sec"]) / 60))
+        o_walk_min  = round(_walk_seconds(r["o_walk_km"]) / 60)
+        d_walk_min  = round(_walk_seconds(r["d_walk_km"]) / 60)
+        total_min   = o_walk_min + wait_min + transit_min + d_walk_min
+
+        plan = PlanOut(
+            origin_station=StationOut(**r["o_station"]),
+            dest_station=StationOut(**r["d_station"]),
+            origin_walk_km=r["o_walk_km"],
+            dest_walk_km=r["d_walk_km"],
+            route=RouteOut(stations=route_stations, total_stops=stops, found=True),
+            travel_time=TravelTimeOut(
+                stops=stops,
+                transit_minutes=transit_min,
+                wait_minutes=wait_min,
+                total_minutes=total_min,
+                live=r["o_live"],
+                line_departures=line_dep,
+            ),
+        )
+        candidates.append(plan)
+        candidate_lines.append(sorted(list(r["group"])))
+
+        signals_list.append(RouteSignals(
+            eta_minutes=float(transit_min),
+            delay_probability=0.2,   # placeholder — swap in ML output later
+            preference_score=0.7,    # placeholder
+            safety_score=0.8,        # placeholder
+            ml_confidence=0.9,       # placeholder
+        ))
+
+    # Score and rank
+    ranked = rank_routes(
+        [c.model_dump() for c in candidates],
+        signals_list
     )
-    path = r["path"]
-    route_stations = [StationOut(**station_map[sid]) for sid in path if sid in station_map]
 
-    stops          = max(0, len(path) - 1)
-    wait_min       = round(r["o_wait_sec"] / 60)
-    transit_min    = max(1, round((r["transit_sec"] - r["o_wait_sec"]) / 60))
-    o_walk_min     = round(_walk_seconds(r["o_walk_km"]) / 60)
-    d_walk_min     = round(_walk_seconds(r["d_walk_km"]) / 60)
-    total_min      = o_walk_min + wait_min + transit_min + d_walk_min
-
-    return PlanOut(
-        origin_station=StationOut(**r["o_station"]),
-        dest_station=StationOut(**r["d_station"]),
-        origin_walk_km=r["o_walk_km"],
-        dest_walk_km=r["d_walk_km"],
-        route=RouteOut(stations=route_stations, total_stops=stops, found=True),
-        travel_time=TravelTimeOut(
-            stops=stops,
-            transit_minutes=transit_min,
-            wait_minutes=wait_min,
-            total_minutes=total_min,
-            live=r["o_live"],
-            line_departures=line_dep,
-        ),
+    return PlansOut(
+        routes=[
+            RankedPlanOut(**r, lines=candidate_lines[i])
+            for i, r in enumerate(ranked)
+        ]
     )
 
 

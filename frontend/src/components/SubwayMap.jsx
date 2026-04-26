@@ -7,6 +7,25 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const NYC_CENTER = { longitude: -73.9857, latitude: 40.7484 }
 const LONG_PRESS_MS = 550
 
+const LINE_COLORS = {
+  '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+  '4': '#00933C', '5': '#00933C', '6': '#00933C',
+  '7': '#B933AD',
+  'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+  'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+  'G': '#6CBE45',
+  'J': '#996633', 'Z': '#996633',
+  'L': '#A7A9AC',
+  'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+  'S': '#808183',
+}
+
+function getFastestLine(lineDepartures) {
+  if (!lineDepartures) return null
+  return Object.entries(lineDepartures)
+    .sort(([, a], [, b]) => a.minutes - b.minutes)[0]?.[0] ?? null
+}
+
 // ArcGIS endpoint (NYC OTI) — replaced the broken Socrata URL
 const ARCGIS_BASE =
   'https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Subway_view/FeatureServer/0/query'
@@ -69,11 +88,24 @@ export function walkLineGeoJSON(from, to) {
 export default function SubwayMap({
   userLocation, userStation, destination, destStation, route,
   onPinOrigin, onPinDestination, candidateLocations = [],
+  theme, onThemeToggle,
+  selectedLine, lineDepartures,
 }) {
+  const activeLine = selectedLine ?? getFastestLine(lineDepartures)
+  const routeColor = LINE_COLORS[activeLine] ?? '#4f6ef7'
   const mapRef = useRef(null)
   const [subwayLines, setSubwayLines] = useState(null)
-  const [viewState, setViewState] = useState({ ...NYC_CENTER, zoom: 12, pitch: 0, bearing: 0 })
+  const [viewState, setViewState] = useState({ ...NYC_CENTER, zoom: 13.5, pitch: 45, bearing: -10 })
   const [selectedCandidate, setSelectedCandidate] = useState(null)
+  const [is3D, setIs3D] = useState(true)
+
+  const toggle3D = useCallback(() => {
+    const next = !is3D
+    setIs3D(next)
+    if (mapRef.current) {
+      mapRef.current.easeTo({ pitch: next ? 45 : 0, bearing: next ? -10 : 0, duration: 600 })
+    }
+  }, [is3D])
 
   // Long-press state
   const timerRef = useRef(null)
@@ -254,7 +286,7 @@ export default function SubwayMap({
         onMove={e => setViewState(e.viewState)}
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        mapStyle="mapbox://styles/mapbox/dark-v11"
+        mapStyle={theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11'}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -265,16 +297,101 @@ export default function SubwayMap({
       >
         <NavigationControl position="top-right" />
 
+        <button
+          className={styles.themeToggle}
+          onClick={onThemeToggle}
+          title="Toggle Light/Dark Mode"
+        >
+          {theme === 'light' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          )}
+        </button>
+
+        <button
+          className={styles.viewToggle}
+          onClick={toggle3D}
+          title={is3D ? 'Switch to 2D view' : 'Switch to 3D view'}
+        >
+          {is3D ? '2D' : '3D'}
+        </button>
+
+        {/* Sky atmosphere — visible when map is pitched */}
+        <Layer
+          id="sky"
+          type="sky"
+          paint={{
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 90.0],
+            'sky-atmosphere-sun-intensity': 15,
+            'sky-atmosphere-color': theme === 'light'
+              ? 'rgba(186,210,235,1)'
+              : 'rgba(12,14,28,1)',
+          }}
+        />
+
+        {/* 3D buildings — real NYC building heights from Mapbox composite tileset.
+            Placed first so it renders below subway overlay and route lines. */}
+        <Layer
+          id="3d-buildings"
+          type="fill-extrusion"
+          layout={{ visibility: is3D ? 'visible' : 'none' }}
+          source="composite"
+          source-layer="building"
+          minzoom={14}
+          filter={['==', 'extrude', 'true']}
+          paint={{
+            'fill-extrusion-color': theme === 'light'
+              ? ['case',
+                  ['>', ['get', 'height'], 100], '#b8c2cc',
+                  '#c8d0d9',
+                ]
+              : ['case',
+                  ['>', ['get', 'height'], 200], '#2a3050',
+                  ['>', ['get', 'height'], 100], '#222640',
+                  ['>', ['get', 'height'], 50],  '#1c2035',
+                  '#171a2c',
+                ],
+            // Animate buildings rising from ground as zoom crosses 15
+            'fill-extrusion-height': [
+              'interpolate', ['linear'], ['zoom'],
+              14, 0,
+              14.2, ['get', 'height'],
+            ],
+            'fill-extrusion-base': [
+              'interpolate', ['linear'], ['zoom'],
+              14, 0,
+              14.2, ['get', 'min_height'],
+            ],
+            'fill-extrusion-opacity': theme === 'light' ? 0.72 : 0.82,
+            'fill-extrusion-ambient-occlusion-intensity': 0.4,
+            'fill-extrusion-ambient-occlusion-radius': 3,
+          }}
+        />
+
         {/* Subway network background — ArcGIS track geometry, uniform dim color */}
         {subwayLines && (
           <Source id="subway-lines" type="geojson" data={subwayLines}>
             <Layer id="subway-lines-casing" type="line"
-              paint={{ 'line-color': '#000', 'line-width': 4, 'line-opacity': 0.4 }}
+              paint={{ 'line-color': theme === 'light' ? '#fff' : '#000', 'line-width': 4, 'line-opacity': 0.4 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             <Layer id="subway-lines-fill" type="line"
               paint={{
-                'line-color': '#4a4f6a',
+                'line-color': theme === 'light' ? '#cbd5e1' : '#4a4f6a',
                 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 2.5],
                 'line-opacity': 0.7,
               }}
@@ -282,6 +399,100 @@ export default function SubwayMap({
             />
           </Source>
         )}
+
+        {/* POI circles — zoom-gated, filterrank-capped, Apple Maps style
+            filterrank 1 = landmark/famous · 2 = well-known · 3 = common
+            zoom 15 → rank ≤ 1 only | zoom 16 → rank ≤ 2 | zoom 17 → rank ≤ 3
+        */}
+        <Source id="mapbox-pois" type="vector" url="mapbox://mapbox.mapbox-streets-v8">
+          {/* Filled circle per category */}
+          <Layer
+            id="poi-circles"
+            type="circle"
+            source-layer="poi_label"
+            minzoom={15}
+            filter={['all',
+              ['in', ['get', 'class'], ['literal', [
+                'food_and_drink', 'arts_and_entertainment', 'hotel', 'park_like', 'education',
+              ]]],
+              ['<=', ['get', 'filterrank'],
+                ['step', ['zoom'], 1, 16, 2, 17, 3]
+              ],
+            ]}
+            paint={{
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 15, 6, 18, 11],
+              'circle-color': [
+                'match', ['get', 'class'],
+                'food_and_drink',         '#FF9500',
+                'arts_and_entertainment', '#AF52DE',
+                'hotel',                  '#5AC8FA',
+                'park_like',              '#34C759',
+                'education',              '#007AFF',
+                '#8E8E93',
+              ],
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': theme === 'light' ? '#fff' : 'rgba(255,255,255,0.85)',
+              'circle-opacity':        ['interpolate', ['linear'], ['zoom'], 15, 0, 15.4, 0.92],
+              'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.4, 0.92],
+            }}
+          />
+          {/* Maki icon inside circle */}
+          <Layer
+            id="poi-icons"
+            type="symbol"
+            source-layer="poi_label"
+            minzoom={15}
+            filter={['all',
+              ['in', ['get', 'class'], ['literal', [
+                'food_and_drink', 'arts_and_entertainment', 'hotel', 'park_like', 'education',
+              ]]],
+              ['<=', ['get', 'filterrank'],
+                ['step', ['zoom'], 1, 16, 2, 17, 3]
+              ],
+            ]}
+            layout={{
+              'icon-image': ['get', 'maki'],
+              'icon-size': ['interpolate', ['linear'], ['zoom'], 15, 0.45, 18, 0.75],
+              'icon-allow-overlap': false,
+              'icon-ignore-placement': false,
+            }}
+            paint={{
+              'icon-color': '#fff',
+              'icon-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.4, 1],
+            }}
+          />
+          {/* Name label — fades in at zoom 16 */}
+          <Layer
+            id="poi-names"
+            type="symbol"
+            source-layer="poi_label"
+            minzoom={16}
+            filter={['all',
+              ['in', ['get', 'class'], ['literal', [
+                'food_and_drink', 'arts_and_entertainment', 'hotel', 'park_like', 'education',
+              ]]],
+              ['<=', ['get', 'filterrank'],
+                ['step', ['zoom'], 1, 16, 2, 17, 3]
+              ],
+            ]}
+            layout={{
+              'text-field': ['get', 'name'],
+              'text-size': ['interpolate', ['linear'], ['zoom'], 16, 10, 18, 12],
+              'text-offset': [0, 1.4],
+              'text-anchor': 'top',
+              'text-max-width': 8,
+              'text-allow-overlap': false,
+              'text-optional': true,
+              'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Regular'],
+            }}
+            paint={{
+              'text-color': theme === 'light' ? '#111827' : '#e8eaf6',
+              'text-halo-color': theme === 'light' ? 'rgba(255,255,255,0.9)' : 'rgba(15,17,23,0.85)',
+              'text-halo-width': 1.5,
+              'text-opacity': ['interpolate', ['linear'], ['zoom'], 16, 0, 16.4, 1],
+            }}
+          />
+        </Source>
 
         {/* Walk lines */}
         {userToStation && (
@@ -294,7 +505,7 @@ export default function SubwayMap({
         {destToStation && (
           <Source id="walk-dest" type="geojson" data={destToStation}>
             <Layer id="walk-dest-line" type="line"
-              paint={{ 'line-color': '#f97316', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.8 }}
+              paint={{ 'line-color': '#4f6ef7', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': 0.8 }}
             />
           </Source>
         )}
@@ -304,17 +515,17 @@ export default function SubwayMap({
           <Source id="route" type="geojson" data={routeGeoJSON}>
             {/* Outer glow */}
             <Layer id="route-glow" type="line"
-              paint={{ 'line-color': '#4f6ef7', 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 6 }}
+              paint={{ 'line-color': routeColor, 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 6 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             {/* Dark casing for contrast */}
             <Layer id="route-casing" type="line"
-              paint={{ 'line-color': '#0d1020', 'line-width': 9, 'line-opacity': 0.9 }}
+              paint={{ 'line-color': theme === 'light' ? '#fff' : '#0d1020', 'line-width': 9, 'line-opacity': 0.9 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
             {/* Main route line */}
             <Layer id="route-line" type="line"
-              paint={{ 'line-color': '#4f6ef7', 'line-width': 5, 'line-opacity': 1 }}
+              paint={{ 'line-color': routeColor, 'line-width': 5, 'line-opacity': 1 }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
           </Source>
@@ -333,7 +544,7 @@ export default function SubwayMap({
         {/* Origin station ring */}
         {userStation?.lon && (
           <Marker longitude={userStation.lon} latitude={userStation.lat} anchor="center">
-            <div className={styles.stationMarker} style={{ borderColor: '#4f6ef7' }} />
+            <div className={styles.stationMarker} style={{ borderColor: routeColor }} />
           </Marker>
         )}
 
@@ -347,7 +558,7 @@ export default function SubwayMap({
         {/* Dest station ring */}
         {destStation?.lon && destStation.id !== userStation?.id && (
           <Marker longitude={destStation.lon} latitude={destStation.lat} anchor="center">
-            <div className={styles.stationMarker} style={{ borderColor: '#f97316' }} />
+            <div className={styles.stationMarker} style={{ borderColor: '#e8eaf6' }} />
           </Marker>
         )}
 

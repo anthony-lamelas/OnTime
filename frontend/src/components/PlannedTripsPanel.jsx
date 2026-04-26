@@ -1,52 +1,122 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import styles from './TripPlanner.module.css'
 import ptStyles from './PlannedTripsPanel.module.css'
 import SidebarNav from './SidebarNav'
-
-// Mock Data
-const INITIAL_PLANNED_TRIPS = [
-  {
-    id: 1,
-    origin: { lat: 40.7128, lon: -74.0060, name: '123 Fake St, New York', label: '123 Fake St' },
-    destination: { lat: 40.7580, lon: -73.9855, name: 'Times Square, New York', label: 'Times Square' },
-    date: '2026-05-15',
-    time: '08:30',
-  }
-]
+import PlaceSearch from './PlaceSearch'
 
 export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, onSelectRoute }) {
-  const [trips, setTrips] = useState(INITIAL_PLANNED_TRIPS)
+  const [trips, setTrips] = useState([])
   const [isAdding, setIsAdding] = useState(false)
   const [formData, setFormData] = useState({
-    origin: '',
-    destination: '',
+    origin: null,
+    destination: null,
     date: '',
     time: ''
   })
 
-  // To simulate selecting locations. In a full implementation, you would reuse PlaceSearch
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setTrips([])
+      return
+    }
+    const fetchTrips = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const res = await fetch('/api/planned_trips/', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTrips(data)
+        }
+      } catch (e) {
+        console.error("Failed to load planned trips:", e)
+      }
+    }
+    fetchTrips()
+  }, [isLoggedIn])
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault()
-    const newTrip = {
-      id: Date.now(),
-      origin: { lat: 40.7128, lon: -74.0060, name: formData.origin, label: formData.origin },
-      destination: { lat: 40.7580, lon: -73.9855, name: formData.destination, label: formData.destination },
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const tripDateTime = new Date(`${formData.date}T${formData.time}`)
+    if (tripDateTime < new Date()) {
+      alert("You cannot schedule a trip in the past.")
+      return
+    }
+
+    if (!formData.origin || !formData.destination) {
+      alert("Please select valid locations from the dropdown searches.")
+      return
+    }
+
+    const newTripPayload = {
+      origin: formData.origin,
+      destination: formData.destination,
       date: formData.date,
       time: formData.time,
     }
-    setTrips([newTrip, ...trips])
-    setIsAdding(false)
-    setFormData({ origin: '', destination: '', date: '', time: '' })
+
+    try {
+      const res = await fetch('/api/planned_trips/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newTripPayload)
+      })
+      if (res.ok) {
+        const trip = await res.json()
+        setTrips([trip, ...trips])
+        setIsAdding(false)
+        setFormData({ origin: null, destination: null, date: '', time: '' })
+      } else {
+        throw new Error("Failed to save trip")
+      }
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   const handleTripClick = (trip) => {
     onSelectRoute(trip.origin, trip.destination)
     setView('home')
   }
+
+  const handleDeleteTrip = async (e, id) => {
+    e.stopPropagation()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`/api/planned_trips/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setTrips(trips.filter(t => t.id !== id))
+    } catch (err) { console.error(err) }
+  }
+
+  const renderTripCard = (trip, isPast) => (
+    <div key={trip.id} className={ptStyles.card} style={isPast ? { opacity: 0.6 } : {}} onClick={() => handleTripClick(trip)}>
+      <div className={ptStyles.cardHeader}>
+        <div className={ptStyles.cardTime}>
+          {trip.date} at {trip.time}
+        </div>
+        <button type="button" className={ptStyles.deleteBtn} onClick={(e) => handleDeleteTrip(e, trip.id)}>×</button>
+      </div>
+      <div className={ptStyles.cardRoute}>
+        {trip.origin.label} → {trip.destination.label}
+      </div>
+    </div>
+  )
+
+  const now = new Date()
+  const upcomingTrips = trips.filter(trip => new Date(`${trip.date}T${trip.time}`) >= now)
+  const pastTrips = trips.filter(trip => new Date(`${trip.date}T${trip.time}`) < now)
 
   return (
     <aside className={styles.panel}>
@@ -75,11 +145,19 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
             <h3 className={ptStyles.subtitle}>New Trip</h3>
             <div className={ptStyles.inputGroup}>
               <label>Origin</label>
-              <input type="text" name="origin" required value={formData.origin} onChange={handleChange} placeholder="e.g. 123 Fake St"/>
+              <PlaceSearch
+                placeholder="Search starting point..."
+                value={formData.origin?.name || ''}
+                onSelect={sel => setFormData({ ...formData, origin: sel })}
+              />
             </div>
             <div className={ptStyles.inputGroup}>
               <label>Destination</label>
-              <input type="text" name="destination" required value={formData.destination} onChange={handleChange} placeholder="e.g. Times Square"/>
+              <PlaceSearch
+                placeholder="Search destination..."
+                value={formData.destination?.name || ''}
+                onSelect={sel => setFormData({ ...formData, destination: sel })}
+              />
             </div>
             <div className={ptStyles.row}>
               <div className={ptStyles.inputGroup}>
@@ -98,17 +176,15 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
           </form>
         ) : (
           <div className={ptStyles.tripList}>
-            {trips.length === 0 && <div className={ptStyles.empty}>No trips planned.</div>}
-            {trips.map(trip => (
-              <div key={trip.id} className={ptStyles.card} onClick={() => handleTripClick(trip)}>
-                <div className={ptStyles.cardTime}>
-                  {trip.date} at {trip.time}
-                </div>
-                <div className={ptStyles.cardRoute}>
-                  {trip.origin.label} → {trip.destination.label}
-                </div>
-              </div>
-            ))}
+            {upcomingTrips.length === 0 && <div className={ptStyles.empty}>No upcoming trips planned.</div>}
+            {upcomingTrips.map(trip => renderTripCard(trip, false))}
+
+            {pastTrips.length > 0 && (
+              <>
+                <h3 className={ptStyles.subtitle} style={{ marginTop: '24px' }}>Past Trips</h3>
+                {pastTrips.map(trip => renderTripCard(trip, true))}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -117,7 +193,11 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
         isLoggedIn={isLoggedIn} 
         currentView="plannedTrips" 
         setView={setView} 
-        onLogout={() => setIsLoggedIn(false)} 
+        onLogout={() => {
+          localStorage.removeItem('token')
+          setIsLoggedIn(false)
+          setView('home')
+        }} 
       />
     </aside>
   )

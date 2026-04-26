@@ -4,3 +4,126 @@
   height: 100dvh;
   overflow: hidden;
 }
+
+.sidebar {
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+  min-width: 220px;
+  max-width: 640px;
+}
+
+.resizeHandle {
+  width: 8px;
+  flex-shrink: 0;
+  height: 100%;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: transparent;
+}
+
+.resizeHandle:hover .resizeBar,
+.resizeHandle:active .resizeBar {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.resizeBar {
+  width: 3px;
+  height: 48px;
+  border-radius: 9999px;
+  background: var(--border);
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+/* ── Mobile layout ─────────────────────────────── */
+.mobileLayout {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.mobileMapWrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobileSheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: 18px 18px 0 0;
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-height: 80px;
+  will-change: height;
+}
+
+.sheetHandleBar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.sheetPill {
+  width: 36px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--border);
+}
+
+.sheetContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mapTapOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 49;
+  cursor: pointer;
+}
+
+.mobileSearchPill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 32px);
+  margin: 0 16px;
+  padding: 13px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.mobileSearchPill svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}

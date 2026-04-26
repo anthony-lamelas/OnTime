@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.mta.feeds import get_live_subway_data, next_departure_minutes, departure_times_by_line
+from app.contracts.subway import StationOut, RouteOut, TravelTimeOut, PlanRequest, PlanOut
 from app.services.route_scorer import RouteSignals, rank_routes
 
 router = APIRouter()
@@ -29,12 +30,42 @@ _stations_cache: list[dict] | None = None
 _graph_cache: dict[str, dict] | None = None
 
 # Routing constants
-TRANSFER_PENALTY_SEC = 240   # 4 min penalty for changing lines at a transfer station
-WALK_SPEED_KMH       = 5.0
-MAX_WALK_ORIGIN_KM   = 1.0   # consider origin stations up to 1 km away
-MAX_WALK_DEST_KM     = 0.8   # consider destination stations up to 0.8 km away
-MAX_ORIGIN_CANDIDATES = 6    # max walkable origin stations to evaluate
+TRANSFER_PENALTY_SEC  = 240   # 4 min penalty for changing lines at a transfer station
+WALK_SPEED_KMH        = 5.0
+MAX_WALK_ORIGIN_KM    = 1.0   # consider origin stations up to 1 km away
+MAX_WALK_DEST_KM      = 0.8   # consider destination stations up to 0.8 km away
+MAX_ORIGIN_CANDIDATES = 6     # max walkable origin stations to evaluate
 MAX_DEST_CANDIDATES   = 5
+
+# Hardcoded NYC subway line groups (shared trunk lines)
+LINE_GROUPS = [
+    frozenset(["A", "C", "E"]),
+    frozenset(["B", "D", "F", "M"]),
+    frozenset(["N", "Q", "R", "W"]),
+    frozenset(["1", "2", "3"]),
+    frozenset(["4", "5", "6"]),
+    frozenset(["J", "Z"]),
+    frozenset(["L"]),
+    frozenset(["G"]),
+    frozenset(["7"]),
+    frozenset(["S"]),
+]
+
+def _get_line_group(line: str) -> frozenset:
+    """Return the group a line belongs to, or a singleton if not found."""
+    for group in LINE_GROUPS:
+        if line in group:
+            return group
+    return frozenset([line])
+
+def _station_line_groups(station: dict) -> list[frozenset]:
+    """Return the unique line groups that serve this station."""
+    seen = []
+    for line in station.get("lines", []):
+        group = _get_line_group(line)
+        if group not in seen:
+            seen.append(group)
+    return seen
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
@@ -151,44 +182,6 @@ def _dijkstra(
 
 # ── API models ────────────────────────────────────────────────────────────────
 
-class StationOut(BaseModel):
-    id: str
-    name: str
-    lines: list[str]
-    lat: Optional[float]
-    lon: Optional[float]
-
-
-class RouteOut(BaseModel):
-    stations: list[StationOut]
-    total_stops: int
-    found: bool
-
-
-class TravelTimeOut(BaseModel):
-    stops: int
-    transit_minutes: int
-    wait_minutes: int
-    total_minutes: int
-    live: bool
-    line_departures: dict = {}   # {line: {"minutes": int, "live": bool}}
-
-
-class PlanRequest(BaseModel):
-    origin_lat: float
-    origin_lon: float
-    dest_lat: float
-    dest_lon: float
-    preferred_line: str | None = None
-
-class PlanOut(BaseModel):
-    origin_station: StationOut
-    dest_station: StationOut
-    origin_walk_km: float
-    dest_walk_km: float
-    route: RouteOut
-    travel_time: TravelTimeOut
-
 class RankedPlanOut(BaseModel):
     origin_station: StationOut
     dest_station: StationOut
@@ -218,10 +211,9 @@ async def plan_trip(req: PlanRequest):
     Strategy:
       1. Enumerate all candidate origin stations within walking distance.
       2. Enumerate all candidate destination stations within walking distance.
-      3. For each (origin_station, dest_station) pair, run Dijkstra with real
-         GTFS edge times and a transfer penalty.
+      3. For each line group at the origin, run Dijkstra with that group preferred.
       4. Total cost = walk_to_origin + wait_for_train + dijkstra_transit + walk_from_dest.
-      5. Return the combination with the lowest total time.
+      5. Score and rank the top results, return ranked list.
     """
     stations = _load_stations()
     if _graph_cache is None:
@@ -272,54 +264,21 @@ async def plan_trip(req: PlanRequest):
         w = await next_departure_minutes(s["id"], s.get("lines", []))
         return w * 60 if w is not None else 300   # default 5 min
 
-    # Hardcoded NYC subway line groups (shared trunk lines)
-    LINE_GROUPS = [
-        frozenset(["A", "C", "E"]),
-        frozenset(["B", "D", "F", "M"]),
-        frozenset(["N", "Q", "R", "W"]),
-        frozenset(["1", "2", "3"]),
-        frozenset(["4", "5", "6"]),
-        frozenset(["J", "Z"]),
-        frozenset(["L"]),
-        frozenset(["G"]),
-        frozenset(["7"]),
-        frozenset(["S"]),
-    ]
-
-    def _get_line_group(line: str) -> frozenset:
-        """Return the group a line belongs to, or a singleton if not found."""
-        for group in LINE_GROUPS:
-            if line in group:
-                return group
-        return frozenset([line])
-
-    def _station_line_groups(station: dict) -> list[frozenset]:
-        """Return the unique line groups that serve this station."""
-        seen = []
-        for line in station.get("lines", []):
-            group = _get_line_group(line)
-            if group not in seen:
-                seen.append(group)
-        return seen
-
-    # Build origin waits as before
     wait_tasks = [_get_wait(s) for _, s in origin_candidates]
     wait_secs_list = await asyncio.gather(*wait_tasks)
     origin_waits = {
-        s["id"]: (wait_secs_list[i], wait_secs_list[i] < 300)
+        s["id"]: (wait_secs_list[i], wait_secs_list[i] < 300)  # (seconds, is_live)
         for i, (_, s) in enumerate(origin_candidates)
     }
 
     # Run Dijkstra once per line group across all origin/destination pairs
+    forced_group = _get_line_group(req.preferred_line) if req.preferred_line else None
     group_results: dict[frozenset, dict] = {}  # best result per line group
 
-    # If a specific line is preferred, restrict to just that group
-    forced_group = _get_line_group(req.preferred_line) if req.preferred_line else None
-
     for o_km, o_station in origin_candidates:
-        o_walk_sec = _walk_seconds(o_km)
+        o_walk_sec         = _walk_seconds(o_km)
         o_wait_sec, o_live = origin_waits[o_station["id"]]
-        station_groups = _station_line_groups(o_station)
+        station_groups     = _station_line_groups(o_station)
 
         for group in station_groups:
             if forced_group and group != forced_group:
@@ -364,8 +323,8 @@ async def plan_trip(req: PlanRequest):
 
     # Build a PlanOut and RouteSignals for each candidate
     candidates = []
-    candidate_lines = []
     signals_list = []
+    candidate_lines = []
 
     for r in top_results:
         line_dep = await departure_times_by_line(
@@ -400,7 +359,6 @@ async def plan_trip(req: PlanRequest):
         )
         candidates.append(plan)
         candidate_lines.append(sorted(list(r["group"])))
-
         signals_list.append(RouteSignals(
             eta_minutes=float(transit_min),
             delay_probability=0.2,   # placeholder — swap in ML output later

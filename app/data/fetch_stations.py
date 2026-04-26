@@ -29,25 +29,22 @@ def _parse_time(t: str) -> int | None:
 
 
 def main():
-    print(f"Downloading GTFS…")
     resp = httpx.get(GTFS_URL, follow_redirects=True, timeout=60)
     resp.raise_for_status()
-    print(f"  {len(resp.content) // 1024} KB downloaded")
 
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
         stops_raw      = zf.read("stops.txt").decode("utf-8")
         trips_raw      = zf.read("trips.txt").decode("utf-8")
         stop_times_raw = zf.read("stop_times.txt").decode("utf-8")
 
-    # ── trip_id → route_id ────────────────────────────────────────────────────
+
     trip_to_route: dict[str, str] = {}
     for row in csv.DictReader(io.StringIO(trips_raw)):
         trip_to_route[row["trip_id"]] = row["route_id"]
 
-    # ── Parse stop_times once ─────────────────────────────────────────────────
+
     # Collect per-trip stop sequences with scheduled times.
     # trip_seq: trip_id → [(stop_seq, stop_id_stripped, departure_sec)]
-    print("Parsing stop_times.txt…")
     trip_seq:    dict[str, list] = defaultdict(list)
     stop_routes: dict[str, set]  = defaultdict(set)
 
@@ -65,9 +62,8 @@ def main():
         stop_routes[sid].add(rid)
         trip_seq[tid].append((seq, sid, t))
 
-    # ── Build edge graph ───────────────────────────────────────────────────────
+
     # edge_data: (a, b) → {lines: set, times: [seconds, ...]}
-    print("Building edge graph…")
     edge_data: dict[tuple, dict] = {}
 
     for tid, stops in trip_seq.items():
@@ -92,10 +88,6 @@ def main():
                 if 0 < dt < 600:          # 0–10 min: sensible range
                     edge_data[key]["times"].append(dt)
 
-    print(f"  {len(edge_data)} unique edges")
-
-    # ── Build stations list ────────────────────────────────────────────────────
-    print("Building station list…")
     stations: dict[str, dict] = {}
     for row in csv.DictReader(io.StringIO(stops_raw)):
         loc_type   = row.get("location_type", "0").strip()
@@ -124,9 +116,6 @@ def main():
             "lines": sorted(stop_routes.get(sid, set())),
         }
 
-    print(f"  {len(stations)} stations")
-
-    # ── Assemble graph output ──────────────────────────────────────────────────
     # Format: { station_id: { neighbor_id: { "time_sec": int, "lines": [str] } } }
     graph: dict[str, dict] = defaultdict(dict)
     DEFAULT_SEC = 120   # 2 min fallback if no timing data
@@ -139,18 +128,14 @@ def main():
         graph[a][b] = {"time_sec": t_sec, "lines": lines}
         graph[b][a] = {"time_sec": t_sec, "lines": lines}
 
-    # ── Save ─────────────────────────────────────────────────────────────────
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     with open(OUT_DIR / "stations.json", "w") as f:
         json.dump(list(stations.values()), f)
-    print(f"Saved stations.json")
 
     with open(OUT_DIR / "subway_graph.json", "w") as f:
         json.dump(dict(graph), f)
-    print(f"Saved subway_graph.json  ({len(graph)} nodes)")
-
-    print("Done.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - ontime_postgres_prod_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ontime
+    ports:
+      - "5432:5432" # Mapping natively against EC2's standard localhost parameters safely bypassing any generic test ports.
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Inject postgres internal container port bypass map over DB cluster bridging via docker networks natively.
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ontime
+      - SECRET_KEY=${SECRET_KEY:-generate_a_secure_random_string_here_like_openssl_rand_base64_32}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_MAPBOX_TOKEN=${VITE_MAPBOX_TOKEN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ontime_postgres_prod_data:

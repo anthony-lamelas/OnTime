@@ -1,46 +1,49 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import styles from './TripPlanner.module.css'
 import favStyles from './FavoritesPanel.module.css'
 import SidebarNav from './SidebarNav'
-
-// Mock Data
-const MOCK_FAVORITE_ROUTES = [
-  {
-    id: 1,
-    name: 'Home to Work',
-    origin: { lat: 40.7128, lon: -74.0060, name: '123 Fake St, New York', label: '123 Fake St' },
-    destination: { lat: 40.7580, lon: -73.9855, name: 'Times Square, New York', label: 'Times Square' }
-  },
-  {
-    id: 2,
-    name: 'Work to Gym',
-    origin: { lat: 40.7580, lon: -73.9855, name: 'Times Square, New York', label: 'Times Square' },
-    destination: { lat: 40.7306, lon: -73.9965, name: 'Washington Square Park, New York', label: 'Washington Square Park' }
-  }
-]
-
-const MOCK_FAVORITE_LOCATIONS = [
-  {
-    id: 1,
-    name: 'JFK Airport',
-    location: { lat: 40.6413, lon: -73.7781, name: 'JFK Airport, Queens', label: 'JFK Airport' }
-  },
-  {
-    id: 2,
-    name: 'Central Park',
-    location: { lat: 40.7822, lon: -73.9653, name: 'Central Park, New York', label: 'Central Park' }
-  }
-]
+import PlaceSearch from './PlaceSearch'
 
 export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onSelectRoute, onSelectLocation }) {
-  const [routes, setRoutes] = useState(MOCK_FAVORITE_ROUTES)
-  const [locations, setLocations] = useState(MOCK_FAVORITE_LOCATIONS)
+  const [routes, setRoutes] = useState([])
+  const [locations, setLocations] = useState([])
   
   const [isAddingRoute, setIsAddingRoute] = useState(false)
   const [isAddingLocation, setIsAddingLocation] = useState(false)
   
-  const [routeForm, setRouteForm] = useState({ name: '', origin: '', destination: '' })
-  const [locationForm, setLocationForm] = useState({ name: '', location: '' })
+  const [routeForm, setRouteForm] = useState({ name: '', origin: null, destination: null })
+  const [locationForm, setLocationForm] = useState({ name: '', location: null })
+
+  const fetchFavorites = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    try {
+      const [routeRes, locRes] = await Promise.all([
+        fetch('/api/favorites/routes', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/favorites/locations', { headers: { Authorization: `Bearer ${token}` } })
+      ])
+      if (routeRes.ok) {
+        const routeData = await routeRes.json()
+        setRoutes(routeData)
+      }
+      if (locRes.ok) {
+        const locData = await locRes.json()
+        setLocations(locData)
+      }
+    } catch (err) {
+      console.error('Failed to fetch favorites', err)
+    }
+  }
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchFavorites()
+    } else {
+      setRoutes([])
+      setLocations([])
+    }
+  }, [isLoggedIn])
 
   const handleRouteClick = (route) => {
     onSelectRoute(route.origin, route.destination)
@@ -52,29 +55,93 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
     setView('home')
   }
 
-  const handleAddRoute = (e) => {
-    e.preventDefault()
-    const newRoute = {
-      id: Date.now(),
-      name: routeForm.name || 'Custom Route',
-      origin: { lat: 40.7128, lon: -74.0060, name: routeForm.origin, label: routeForm.origin },
-      destination: { lat: 40.7580, lon: -73.9855, name: routeForm.destination, label: routeForm.destination }
-    }
-    setRoutes([newRoute, ...routes])
-    setIsAddingRoute(false)
-    setRouteForm({ name: '', origin: '', destination: '' })
+  const handleDeleteRoute = async (e, id) => {
+    e.stopPropagation()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`/api/favorites/routes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setRoutes(routes.filter(r => r.id !== id))
+    } catch (err) { console.error(err) }
   }
 
-  const handleAddLocation = (e) => {
+  const handleDeleteLocation = async (e, id) => {
+    e.stopPropagation()
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`/api/favorites/locations/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setLocations(locations.filter(l => l.id !== id))
+    } catch (err) { console.error(err) }
+  }
+
+  const handleAddRoute = async (e) => {
     e.preventDefault()
-    const newLoc = {
-      id: Date.now(),
-      name: locationForm.name || 'Custom Location',
-      location: { lat: 40.7128, lon: -74.0060, name: locationForm.location, label: locationForm.location }
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    try {
+      if (!routeForm.origin || !routeForm.destination) {
+        alert("Please select valid locations from the dropdown searches.")
+        return
+      }
+      const payload = {
+        name: routeForm.name || 'Custom Route',
+        origin: routeForm.origin,
+        destination: routeForm.destination
+      }
+      
+      const res = await fetch('/api/favorites/routes', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) throw new Error('Failed to save route')
+      const data = await res.json()
+      setRoutes([data, ...routes])
+      
+      setIsAddingRoute(false)
+      setRouteForm({ name: '', origin: null, destination: null })
+    } catch (err) {
+      console.error(err)
     }
-    setLocations([newLoc, ...locations])
-    setIsAddingLocation(false)
-    setLocationForm({ name: '', location: '' })
+  }
+
+  const handleAddLocation = async (e) => {
+    e.preventDefault()
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    try {
+      if (!locationForm.location) {
+        alert("Please select a valid location from the dropdown search.")
+        return
+      }
+      const payload = {
+        name: locationForm.name || 'Custom Location',
+        location: locationForm.location
+      }
+      
+      const res = await fetch('/api/favorites/locations', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) throw new Error('Failed to save location')
+      const data = await res.json()
+      setLocations([data, ...locations])
+      
+      setIsAddingLocation(false)
+      setLocationForm({ name: '', location: null })
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   return (
@@ -108,11 +175,19 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
               </div>
               <div className={favStyles.inputGroup}>
                 <label>Origin</label>
-                <input type="text" required value={routeForm.origin} onChange={e => setRouteForm({...routeForm, origin: e.target.value})} placeholder="Location" />
+                <PlaceSearch
+                  placeholder="Search starting point..."
+                  value={routeForm.origin?.name || ''}
+                  onSelect={sel => setRouteForm({ ...routeForm, origin: sel })}
+                />
               </div>
               <div className={favStyles.inputGroup}>
                 <label>Destination</label>
-                <input type="text" required value={routeForm.destination} onChange={e => setRouteForm({...routeForm, destination: e.target.value})} placeholder="Location" />
+                <PlaceSearch
+                  placeholder="Search destination..."
+                  value={routeForm.destination?.name || ''}
+                  onSelect={sel => setRouteForm({ ...routeForm, destination: sel })}
+                />
               </div>
               <div className={favStyles.formActions}>
                 <button type="button" className={favStyles.cancelBtn} onClick={() => setIsAddingRoute(false)}>Cancel</button>
@@ -121,9 +196,15 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
             </form>
           )}
 
+          {!isAddingRoute && routes.length === 0 && (
+            <div className={favStyles.empty}>No favorite routes saved.</div>
+          )}
           {!isAddingRoute && routes.map(route => (
             <div key={route.id} className={favStyles.card} onClick={() => handleRouteClick(route)}>
-              <div className={favStyles.cardTitle}>{route.name}</div>
+              <div className={favStyles.cardHeader}>
+                <div className={favStyles.cardTitle}>{route.name}</div>
+                <button type="button" className={favStyles.deleteBtn} onClick={(e) => handleDeleteRoute(e, route.id)}>×</button>
+              </div>
               <div className={favStyles.cardDesc}>
                 {route.origin.label} → {route.destination.label}
               </div>
@@ -145,7 +226,11 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
               </div>
               <div className={favStyles.inputGroup}>
                 <label>Address</label>
-                <input type="text" required value={locationForm.location} onChange={e => setLocationForm({...locationForm, location: e.target.value})} placeholder="Location" />
+                <PlaceSearch
+                  placeholder="Search address or place..."
+                  value={locationForm.location?.name || ''}
+                  onSelect={sel => setLocationForm({ ...locationForm, location: sel })}
+                />
               </div>
               <div className={favStyles.formActions}>
                 <button type="button" className={favStyles.cancelBtn} onClick={() => setIsAddingLocation(false)}>Cancel</button>
@@ -154,9 +239,15 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
             </form>
           )}
 
+          {!isAddingLocation && locations.length === 0 && (
+            <div className={favStyles.empty}>No favorite locations saved.</div>
+          )}
           {!isAddingLocation && locations.map(loc => (
             <div key={loc.id} className={favStyles.card} onClick={() => handleLocationClick(loc)}>
-              <div className={favStyles.cardTitle}>{loc.name}</div>
+              <div className={favStyles.cardHeader}>
+                <div className={favStyles.cardTitle}>{loc.name}</div>
+                <button type="button" className={favStyles.deleteBtn} onClick={(e) => handleDeleteLocation(e, loc.id)}>×</button>
+              </div>
               <div className={favStyles.cardDesc}>{loc.location.label}</div>
             </div>
           ))}
@@ -167,7 +258,11 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
         isLoggedIn={isLoggedIn} 
         currentView="favorites" 
         setView={setView} 
-        onLogout={() => setIsLoggedIn(false)} 
+        onLogout={() => {
+          localStorage.removeItem('token')
+          setIsLoggedIn(false)
+          setView('home')
+        }} 
       />
     </aside>
   )

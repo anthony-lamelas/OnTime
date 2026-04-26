@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ML_API_URL: Optional[str] = None
 
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     # Scorer weights
     WEIGHT_ETA: float = 0.35
     WEIGHT_DELAY_RISK: float = 0.25
@@ -15,8 +17,5 @@ class Settings(BaseSettings):
     WEIGHT_SAFETY: float = 0.15
     WEIGHT_UNCERTAINTY_PENALTY: float = 0.05
     ETA_MAX_MINUTES: float = 120.0
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()

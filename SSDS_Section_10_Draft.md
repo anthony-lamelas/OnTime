@@ -92,8 +92,8 @@ flowchart TD
 **1. Data Collection Module**
 ```mermaid
 flowchart LR
-    MTA[MTA Open Data API] --> Fetcher[Python Fetcher Script]
-    Fetcher --> RawStorage[(Raw CSV Storage)]
+    MTA[MTA Open Data API] --> Downloader[Python Download Script]
+    Downloader --> RawStorage[(Raw CSV Storage)]
 ```
 
 **2. Data Preprocessing Module**

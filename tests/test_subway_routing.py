@@ -54,16 +54,19 @@ def test_dijkstra_routing():
     
     # Best path: A -> B -> D using line "2" without transfer penalty
     # Cost = initial(0) + A->B(120) + B->D(60) = 180
-    path, cost = _dijkstra("A", "D", graph, initial_wait_sec=0)
+    path_with_lines, cost = _dijkstra("A", "D", graph, initial_wait_sec=0)
+    path = [sid for sid, _ in path_with_lines]
     assert path == ["A", "B", "D"]
     assert cost == 180
-    
+
     # Start with initial wait 300
-    path, cost = _dijkstra("A", "D", graph, initial_wait_sec=300)
+    path_with_lines, cost = _dijkstra("A", "D", graph, initial_wait_sec=300)
+    path = [sid for sid, _ in path_with_lines]
     assert path == ["A", "B", "D"]
     assert cost == 480
-    
+
     # Preferred line Test -> Force the algo to prioritize line "1" explicitly
-    path, cost = _dijkstra("A", "D", graph, initial_wait_sec=0, preferred_lines=frozenset(["1"]))
+    path_with_lines, cost = _dijkstra("A", "D", graph, initial_wait_sec=0, preferred_lines=frozenset(["1"]))
+    path = [sid for sid, _ in path_with_lines]
     assert path == ["A", "B", "C", "D"]
     assert cost == 300

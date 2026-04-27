@@ -9,8 +9,16 @@ class StationOut(BaseModel):
     lon: Optional[float]
 
 
-class RouteOut(BaseModel):
+class RouteLeg(BaseModel):
+    """A continuous segment of a route on a single subway line."""
+    line: str
     stations: list[StationOut]
+    stops: int
+
+
+class RouteOut(BaseModel):
+    stations: list[StationOut]   # flat list for map rendering
+    legs: list[RouteLeg] = []    # per-line segments for sidebar display
     total_stops: int
     found: bool
 

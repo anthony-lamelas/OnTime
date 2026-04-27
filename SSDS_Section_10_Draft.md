@@ -142,7 +142,9 @@ flowchart TD
 flowchart LR
     Docker[Docker Compositing Interface] --> DB[(PostgreSQL Engine)]
     Docker --> Volumes[Persistent Docker Volumes]
-    Docker --> Services[Containerized FastAPI Host]
+    Docker --> Core[Containerized FastAPI<br/>Core Backend]
+    Docker --> ML[Containerized FastAPI<br/>ML Microservice]
+    Docker --> Front[Containerized React<br/>Frontend]
 ```
 
 ---

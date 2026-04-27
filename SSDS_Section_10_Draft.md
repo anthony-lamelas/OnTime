@@ -100,8 +100,9 @@ flowchart LR
 ```mermaid
 flowchart LR
     Raw[(Raw CSV Storage)] --> Cleaner[Data Cleaner / Imputer]
-    Cleaner --> Engineer[Feature Engineer cyclical]
-    Engineer --> Vector[Vector Output Store]
+    Cleaner --> Time[Temporal Engineer <br/> sin/cos & rush hour]
+    Time --> Encoder[Categorical Label <br/> Encoder]
+    Encoder --> Vector[Vector Output Store]
 ```
 
 **3. Machine Learning Model**

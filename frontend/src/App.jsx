@@ -215,6 +215,8 @@ export default function App() {
     }
   }, [currentView, requestGPS])
 
+  const activePrimaryLine = plan?.lines?.[0] ?? null
+
   // Shared panel content rendered in both mobile and desktop
   const panelContent = (
     <>
@@ -280,7 +282,7 @@ export default function App() {
       candidateLocations={candidateLocations}
       theme={theme}
       onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-      selectedLine={selectedLine}
+      selectedLine={selectedLine ?? activePrimaryLine}
       lineDepartures={plan?.travel_time?.line_departures}
     />
   )

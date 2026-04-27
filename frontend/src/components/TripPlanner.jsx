@@ -103,56 +103,54 @@ function StationChip({ station, label, walkKm, color, allRoutes, activePlan, onP
       <div className={styles.chipDot} style={{ background: color }} />
       <div className={styles.chipBody}>
         <span className={styles.chipLabel}>{label}</span>
+        <span className={styles.chipName}>{station.name}</span>
+        <div className={styles.chipMeta}>
+          <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
+        </div>
 
-        {hasRoutes ? (
-          // Show ranked route options grouped by line
-          <div className={styles.rankedRoutes}>
+        {hasRoutes && (
+          <div className={styles.depList}>
             {allRoutes.map((route, i) => {
-              const isActive = activePlan?.lines?.join() === route.lines?.join()
-              const depLines = Object.keys(route.travel_time.line_departures || {})
-              const soonest = depLines.length
-                ? Math.min(...depLines.map(l => route.travel_time.line_departures[l].minutes))
-                : route.travel_time.wait_minutes
-              const isLive = Object.values(route.travel_time.line_departures || {}).some(d => d.live)
+              const line = route.lines?.[0]
+              const isActive = activePlan?.lines?.[0] === line
+              const minutes = route.travel_time.wait_minutes
+              const isLive = route.travel_time.live
+              const score = route.score
+
+              const delayLabel = score > 0.75 ? 'On time'
+                : score > 0.60 ? 'Minor delays'
+                : 'Delays'
+              const delayColor = score > 0.75 ? '#22c55e'
+                : score > 0.60 ? '#fb923c'
+                : '#ef4444'
+              const delayBg = score > 0.75 ? 'rgba(34,197,94,0.15)'
+                : score > 0.60 ? 'rgba(251,146,60,0.15)'
+                : 'rgba(239,68,68,0.15)'
 
               return (
                 <div
-                  key={i}
-                  className={`${styles.rankedRoute} ${isActive ? styles.rankedRouteActive : ''}`}
+                  key={line}
+                  className={`${styles.depRow} ${isActive ? styles.depRowSelected : ''}`}
                   onClick={() => onPlanSelect(route)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={e => e.key === 'Enter' && onPlanSelect(route)}
                 >
-                  {/* Line badges */}
-                  <div className={styles.routeLineBadges}>
-                    {route.lines.map(l => <LineBadge key={l} line={l} />)}
-                  </div>
-
-                  {/* Wait time */}
+                  <LineBadge line={line} />
                   <span className={isLive ? styles.depTime : styles.depTimeEst}>
-                    {isLive ? `${soonest} min` : `~${soonest} min`}
+                    {isLive ? `${minutes} min` : `~${minutes} min`}
                   </span>
-
-                  {/* Total travel time */}
-                  <span className={styles.routeTotalTime}>
-                    {route.travel_time.total_minutes} min total
+                  <span
+                    className={styles.routeDelayBadge}
+                    style={{ background: delayBg, color: delayColor }}
+                  >
+                    {delayLabel}
                   </span>
-
-                  {/* Active indicator */}
-                  {isActive && <span className={styles.routeActiveCheck}>✓</span>}
+                  {isActive && <span className={styles.depSelected}>✓</span>}
                 </div>
               )
             })}
           </div>
-        ) : (
-          // Fallback: just show station name + walk time
-          <>
-            <span className={styles.chipName}>{station.name}</span>
-            <div className={styles.chipMeta}>
-              <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
-            </div>
-          </>
         )}
       </div>
     </div>

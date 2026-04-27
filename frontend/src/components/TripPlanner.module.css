@@ -444,14 +444,16 @@
     gap: 8px;
     padding: 8px 10px;
     border-radius: 8px;
-    background: var(--surface-2, #f4f4f5);
+    background: var(--bg);
+    border: 1px solid var(--border);
     cursor: pointer;
     transition: background 0.15s;
-    color: #111;
+    color: var(--text);
 }
 
 .rankedRoute:hover {
-    background: var(--surface-3, #e4e4e7);
+    background: var(--surface2);
+    border-color: var(--accent);
 }
 
 .rankedRouteActive {
@@ -474,5 +476,14 @@
 
 .routeActiveCheck {
     font-size: 0.85rem;
+    margin-left: 4px;
+}
+
+.routeDelayBadge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
     margin-left: 4px;
 }

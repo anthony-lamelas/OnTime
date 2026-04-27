@@ -159,47 +159,155 @@ function StationChip({ station, label, walkKm, color, allRoutes, activePlan, onP
 
 function TravelCard({ plan, selectedLine }) {
   if (!plan) return null
-  const { travel_time: tt, origin_walk_km, dest_walk_km } = plan
+  const { travel_time: tt, origin_walk_km, dest_walk_km, route } = plan
   if (!tt || tt.stops === 0) return null
 
   const originWalkMin = Math.max(1, Math.round((origin_walk_km / 5) * 60))
   const destWalkMin = Math.max(1, Math.round((dest_walk_km / 5) * 60))
   const total = originWalkMin + (tt.wait_minutes ?? 5) + tt.transit_minutes + destWalkMin
+  const legs = route?.legs ?? []
+  const hasTransfers = legs.length > 1
 
   return (
     <div className={styles.travelCard}>
-      <div className={styles.travelTotal}>
-        <span className={styles.travelTotalNum}>{total}</span>
-        <span className={styles.travelTotalLabel}>min</span>
+      {/* Header: total time + line badges overview */}
+      <div className={styles.travelHeader}>
+        <div className={styles.travelTotal}>
+          <span className={styles.travelTotalNum}>{total}</span>
+          <span className={styles.travelTotalLabel}>min</span>
+        </div>
+        <div className={styles.travelLineSummary}>
+          {legs.map((leg, i) => (
+            <span key={i} className={styles.travelLineSummaryItem}>
+              <LineBadge line={leg.line} />
+              {i < legs.length - 1 && <span className={styles.travelArrow}>→</span>}
+            </span>
+          ))}
+          {hasTransfers && (
+            <span className={styles.transferBadge}>
+              {legs.length - 1} transfer{legs.length > 2 ? 's' : ''}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className={styles.travelBreakdown}>
-        <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Walk </span>
-          <span>{originWalkMin} min</span>
-          <span className={styles.travelStepLabel}>Walk to station</span>
+      {/* Timeline */}
+      <div className={styles.timeline}>
+
+        {/* Walk to station */}
+        <div className={styles.timelineRow}>
+          <div className={styles.timelineLeft}>
+            <div className={styles.timelineDot} style={{ background: 'var(--text-muted)' }} />
+            <div className={styles.timelineLine} style={{ background: 'var(--border)' }} />
+          </div>
+          <div className={styles.timelineContent}>
+            <span className={styles.timelineStation}>Your location</span>
+            <span className={styles.timelineMeta}>
+              <span className={styles.timelineWalkIcon}>🚶</span>
+              {originWalkMin} min walk
+            </span>
+          </div>
         </div>
-        <div className={styles.travelDivider} />
-        <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Wait </span>
-          <span>{tt.wait_minutes ?? 5} min</span>
-          <span className={styles.travelStepLabel}>
-            {selectedLine ? `wait for ${selectedLine} ` : 'wait '}
-            {tt.live ? <span className={styles.livePill}>live</span> : '(estimated)'}
-          </span>
-        </div>
-        <div className={styles.travelDivider} />
-        <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Ride </span>
-          <span>{tt.transit_minutes} min</span>
-          <span className={styles.travelStepLabel}>{tt.stops} stops</span>
-        </div>
-        <div className={styles.travelDivider} />
-        <div className={styles.travelStep}>
-          <span className={styles.travelIcon}>Walk </span>
-          <span>{destWalkMin} min</span>
-          <span className={styles.travelStepLabel}>Walk from station</span>
-        </div>
+
+        {/* Per-leg transit */}
+        {legs.map((leg, i) => {
+          const color = LINE_COLORS[leg.line] ?? '#4f6ef7'
+          const isLast = i === legs.length - 1
+          const boardStation = leg.stations[0]?.name
+          const alightStation = leg.stations[leg.stations.length - 1]?.name
+          const waitMin = i === 0 ? (tt.wait_minutes ?? 5) : null
+
+          return (
+            <div key={`${leg.line}-${i}`}>
+              {/* Board station */}
+              <div className={styles.timelineRow}>
+                <div className={styles.timelineLeft}>
+                  <div className={styles.timelineDot} style={{ background: color, boxShadow: `0 0 0 3px ${color}33` }} />
+                  <div className={styles.timelineLine} style={{ background: color }} />
+                </div>
+                <div className={styles.timelineContent}>
+                  <span className={styles.timelineStation}>{boardStation}</span>
+                  <span className={styles.timelineMeta}>
+                    <LineBadge line={leg.line} />
+                    {waitMin !== null && (
+                      <span className={styles.timelineWait}>
+                        {waitMin} min wait {tt.live ? <span className={styles.livePill}>live</span> : ''}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Stops count indicator */}
+              <div className={styles.timelineRow}>
+                <div className={styles.timelineLeft}>
+                  <div className={styles.timelineLineTall} style={{ background: color }} />
+                </div>
+                <div className={styles.timelineStopsLabel}>
+                  {leg.stops} stop{leg.stops !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {/* Alight / transfer station */}
+              <div className={styles.timelineRow}>
+                <div className={styles.timelineLeft}>
+                  <div
+                    className={styles.timelineDot}
+                    style={{
+                      background: isLast ? 'var(--text)' : '#a855f7',
+                      boxShadow: isLast ? 'none' : '0 0 0 3px rgba(168,85,247,0.25)',
+                    }}
+                  />
+                  {!isLast && <div className={styles.timelineLine} style={{ background: 'var(--border)' }} />}
+                </div>
+                <div className={styles.timelineContent}>
+                  <span className={styles.timelineStation}>{alightStation}</span>
+                  {!isLast && (
+                    <span className={styles.timelineTransferTag}>Transfer here</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Walk gap between legs (transfer wait) */}
+              {!isLast && (
+                <div className={styles.timelineRow}>
+                  <div className={styles.timelineLeft}>
+                    <div className={styles.timelineLine} style={{ background: 'var(--border)', borderStyle: 'dashed' }} />
+                  </div>
+                  <div className={styles.timelineContent}>
+                    <span className={styles.timelineMeta}>Switch to <LineBadge line={legs[i + 1].line} /></span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Walk from last station */}
+        {destWalkMin > 0 && (
+          <>
+            <div className={styles.timelineRow}>
+              <div className={styles.timelineLeft}>
+                <div className={styles.timelineLine} style={{ background: 'var(--border)' }} />
+              </div>
+              <div className={styles.timelineContent}>
+                <span className={styles.timelineMeta}>
+                  <span className={styles.timelineWalkIcon}>🚶</span>
+                  {destWalkMin} min walk
+                </span>
+              </div>
+            </div>
+            <div className={styles.timelineRow}>
+              <div className={styles.timelineLeft}>
+                <div className={styles.timelineDotDest} />
+              </div>
+              <div className={styles.timelineContent}>
+                <span className={styles.timelineStation}>Destination</span>
+              </div>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   )

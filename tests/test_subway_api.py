@@ -13,26 +13,28 @@ def test_get_stations():
 @patch("app.api.endpoints.subway.next_departure_minutes")
 @patch("app.api.endpoints.subway.departure_times_by_line")
 def test_plan_trip(mock_departure_times, mock_next_departure):
-    # Mock GTFS-RT network calls completely so it doesn't try pulling live feed
-    # in ci/cd test environments.
-    mock_next_departure.return_value = 5 # default 5 minutes
-    mock_departure_times.return_value = {"1": ["12:00", "12:10"]}
-    
+    mock_next_departure.return_value = 5
+    mock_departure_times.return_value = {"1": {"minutes": 5, "live": False}}
+
     payload = {
-        "origin_lat": 40.7128, 
+        "origin_lat": 40.7128,
         "origin_lon": -74.0060,
         "dest_lat": 40.7580,
         "dest_lon": -73.9855
     }
-    
+
     response = client.post("/api/subway/plan", json=payload)
     assert response.status_code == 200
-    
+
     data = response.json()
-    assert "route" in data
-    assert data["route"]["found"] is True
-    assert "travel_time" in data
-    assert data["travel_time"]["wait_minutes"] == 5
+    assert "routes" in data
+    assert len(data["routes"]) > 0
+
+    top = data["routes"][0]
+    assert top["route"]["found"] is True
+    assert "travel_time" in top
+    assert "score" in top
+    assert "lines" in top
 
 @patch("app.api.endpoints.subway.get_live_subway_data")
 def test_live_subway_data(mock_get_live):

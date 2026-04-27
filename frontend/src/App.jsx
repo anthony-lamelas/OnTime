@@ -56,7 +56,6 @@ export default function App() {
   const handleResizeStart = useCallback((e) => {
     dragging.current = true
     e.preventDefault()
-
     const onMove = (e) => {
       if (!dragging.current) return
       setSidebarWidth(Math.min(Math.max(e.clientX, 220), 640))
@@ -90,8 +89,9 @@ export default function App() {
   const [candidateLocations, setCandidateLocations] = useState([])
 
   // Plan result from backend
-  const [plan, setPlan] = useState(null)   // PlanOut
+  const [plan, setPlan] = useState(null)
   const [planning, setPlanning] = useState(false)
+  const [allRoutes, setAllRoutes] = useState([])   // all ranked route options
 
   // Selected line at origin station (null = auto-pick fastest)
   const [selectedLine, setSelectedLine] = useState(null)
@@ -125,6 +125,7 @@ export default function App() {
     if (!origin || !destination) return
     setPlanning(true)
     setPlan(null)
+    setAllRoutes([])
     const body = {
       origin_lat: origin.lat,
       origin_lon: origin.lon,
@@ -138,7 +139,14 @@ export default function App() {
       body: JSON.stringify(body),
     })
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
-      .then(setPlan)
+      .then(data => {
+        if (!data.routes?.length) {
+          setPlan({ route: { found: false } })
+          return
+        }
+        setPlan(data.routes[0])       // top-ranked route drives the map
+        setAllRoutes(data.routes)     // all routes for the sidebar
+      })
       .catch((e) => {
         console.error(e)
         setPlan({ route: { found: false } })
@@ -150,6 +158,7 @@ export default function App() {
     setOrigin(loc)
     setPlan(null)
     setSelectedLine(null)
+    setAllRoutes([])
   }, [])
 
   const handleDestChange = useCallback((dest) => {
@@ -157,6 +166,7 @@ export default function App() {
     setPlan(null)
     setSelectedLine(null)
     setCandidateLocations([])
+    setAllRoutes([])
   }, [])
 
   const handleReset = useCallback(() => {
@@ -164,11 +174,18 @@ export default function App() {
     setPlan(null)
     setSelectedLine(null)
     setCandidateLocations([])
+    setAllRoutes([])
   }, [])
 
   // Toggle: clicking the same line again deselects (reverts to auto-route)
   const handleLineSelect = useCallback((line) => {
     setSelectedLine(prev => prev === line ? null : line)
+  }, [])
+
+  // Selecting a ranked route option swaps the active plan
+  const handlePlanSelect = useCallback((route) => {
+    setPlan(route)
+    setSelectedLine(null)
   }, [])
 
   // Map long-press: pinned location → set as origin or destination
@@ -194,8 +211,11 @@ export default function App() {
       setDestination(null)
       setSelectedLine(null)
       setPlan(null)
+      setAllRoutes([])
     }
   }, [currentView, requestGPS])
+
+  const activePrimaryLine = plan?.lines?.[0] ?? null
 
   // Shared panel content rendered in both mobile and desktop
   const panelContent = (
@@ -219,6 +239,8 @@ export default function App() {
           onLineSelect={handleLineSelect}
           onCandidatesChange={setCandidateLocations}
           destInputRef={destInputRef}
+          allRoutes={allRoutes}
+          onPlanSelect={handlePlanSelect}
         />
       )}
       {currentView === 'favorites' && (
@@ -260,7 +282,7 @@ export default function App() {
       candidateLocations={candidateLocations}
       theme={theme}
       onThemeToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-      selectedLine={selectedLine}
+      selectedLine={selectedLine ?? activePrimaryLine}
       lineDepartures={plan?.travel_time?.line_departures}
     />
   )

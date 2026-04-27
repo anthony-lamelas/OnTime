@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import styles from './TripPlanner.module.css'
 import SidebarNav from './SidebarNav'
+import PlaceSearch from './PlaceSearch'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -21,7 +22,7 @@ function LineBadge({ line }) {
   const color = bg === '#FCCC0A' ? '#000' : '#fff'
   return <span className={styles.badge} style={{ background: bg, color }}>{line}</span>
 }
-import PlaceSearch from './PlaceSearch'
+
 function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange }) {
   const [mode, setMode] = useState('gps') // 'gps' | 'custom'
 
@@ -92,33 +93,10 @@ function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange
   )
 }
 
-function LineDepartureRow({ line, minutes, isLive, isSelected, onSelect }) {
-  return (
-    <div
-      className={`${styles.depRow} ${isSelected ? styles.depRowSelected : ''}`}
-      onClick={() => onSelect(line)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onSelect(line)}
-      aria-pressed={isSelected}
-    >
-      <LineBadge line={line} />
-      <span className={isLive ? styles.depTime : styles.depTimeEst}>
-        {isLive ? `${minutes} min` : `~${minutes} min`}
-      </span>
-      <span className={isSelected ? styles.depSelected : styles.depSelect}>
-        {isSelected ? 'Selected ✓' : 'Select'}
-      </span>
-    </div>
-  )
-}
-
-function StationChip({ station, label, walkKm, color, lineDepartures, selectedLine, onLineSelect }) {
+function StationChip({ station, label, walkKm, color, allRoutes, activePlan, onPlanSelect }) {
   if (!station) return null
   const walkMin = Math.max(1, Math.round((walkKm / 5) * 60))
-  const depEntries = lineDepartures
-    ? Object.entries(lineDepartures).sort(([, a], [, b]) => a.minutes - b.minutes)
-    : null
+  const hasRoutes = allRoutes?.length > 0
 
   return (
     <div className={styles.stationChip}>
@@ -128,24 +106,50 @@ function StationChip({ station, label, walkKm, color, lineDepartures, selectedLi
         <span className={styles.chipName}>{station.name}</span>
         <div className={styles.chipMeta}>
           <span className={styles.chipWalk}>🚶 {walkMin} min walk</span>
-          {!depEntries && (
-            <span className={styles.chipLines}>
-              {station.lines.slice(0, 6).map(l => <LineBadge key={l} line={l} />)}
-            </span>
-          )}
         </div>
-        {depEntries && (
+
+        {hasRoutes && (
           <div className={styles.depList}>
-            {depEntries.map(([line, { minutes, live }]) => (
-              <LineDepartureRow
-                key={line}
-                line={line}
-                minutes={minutes}
-                isLive={live}
-                isSelected={selectedLine === line}
-                onSelect={onLineSelect}
-              />
-            ))}
+            {allRoutes.map((route, i) => {
+              const line = route.lines?.[0]
+              const isActive = activePlan?.lines?.[0] === line
+              const minutes = route.travel_time.wait_minutes
+              const isLive = route.travel_time.live
+              const score = route.score
+
+              const delayLabel = score > 0.75 ? 'On time'
+                : score > 0.60 ? 'Minor delays'
+                : 'Delays'
+              const delayColor = score > 0.75 ? '#22c55e'
+                : score > 0.60 ? '#fb923c'
+                : '#ef4444'
+              const delayBg = score > 0.75 ? 'rgba(34,197,94,0.15)'
+                : score > 0.60 ? 'rgba(251,146,60,0.15)'
+                : 'rgba(239,68,68,0.15)'
+
+              return (
+                <div
+                  key={line}
+                  className={`${styles.depRow} ${isActive ? styles.depRowSelected : ''}`}
+                  onClick={() => onPlanSelect(route)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && onPlanSelect(route)}
+                >
+                  <LineBadge line={line} />
+                  <span className={isLive ? styles.depTime : styles.depTimeEst}>
+                    {isLive ? `${minutes} min` : `~${minutes} min`}
+                  </span>
+                  <span
+                    className={styles.routeDelayBadge}
+                    style={{ background: delayBg, color: delayColor }}
+                  >
+                    {delayLabel}
+                  </span>
+                  {isActive && <span className={styles.depSelected}>✓</span>}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -207,6 +211,7 @@ export default function TripPlanner({
   isLoggedIn, setIsLoggedIn, setView,
   selectedLine, onLineSelect, onCandidatesChange,
   destInputRef,
+  allRoutes, onPlanSelect,
 }) {
   return (
     <aside className={styles.panel}>
@@ -240,7 +245,7 @@ export default function TripPlanner({
         />
       </div>
 
-      {/* Station chips */}
+      {/* Station chips — origin shows ranked route options */}
       {plan && (
         <>
           <StationChip
@@ -248,9 +253,9 @@ export default function TripPlanner({
             label="Nearest station to you"
             walkKm={plan.origin_walk_km}
             color="#4f6ef7"
-            lineDepartures={plan.travel_time?.line_departures}
-            selectedLine={selectedLine}
-            onLineSelect={onLineSelect}
+            allRoutes={allRoutes}
+            activePlan={plan}
+            onPlanSelect={onPlanSelect}
           />
           <StationChip
             station={plan.dest_station}
@@ -270,12 +275,12 @@ export default function TripPlanner({
       )}
 
       {/* No route */}
-      {!planning && plan && !plan.route.found && (
+      {!planning && plan && !plan.route?.found && (
         <div className={styles.noRoute}>No subway route found between these stations.</div>
       )}
 
       {/* Travel time card */}
-      {!planning && plan?.route.found && (
+      {!planning && plan?.route?.found && (
         <TravelCard plan={plan} selectedLine={selectedLine} />
       )}
 
@@ -284,14 +289,14 @@ export default function TripPlanner({
         <button className={styles.resetBtn} onClick={onReset}>← New search</button>
       )}
 
-      <SidebarNav 
-        isLoggedIn={isLoggedIn} 
-        currentView="home" 
-        setView={setView} 
+      <SidebarNav
+        isLoggedIn={isLoggedIn}
+        currentView="home"
+        setView={setView}
         onLogout={() => {
           localStorage.removeItem('token')
           setIsLoggedIn(false)
-        }} 
+        }}
       />
     </aside>
   )

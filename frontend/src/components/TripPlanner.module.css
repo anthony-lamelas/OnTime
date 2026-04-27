@@ -429,3 +429,61 @@
   color: #22c55e;
   font-weight: 700;
 }
+
+.rankedRoutes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    width: 100%;
+}
+
+.rankedRoute {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    color: var(--text);
+}
+
+.rankedRoute:hover {
+    background: var(--surface2);
+    border-color: var(--accent);
+}
+
+.rankedRouteActive {
+    background: var(--accent, #4f6ef7);
+    color: #fff;
+}
+
+.routeLineBadges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.routeTotalTime {
+    margin-left: auto;
+    font-size: 0.85rem;
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+.routeActiveCheck {
+    font-size: 0.85rem;
+    margin-left: 4px;
+}
+
+.routeDelayBadge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    margin-left: 4px;
+}

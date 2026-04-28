@@ -108,8 +108,8 @@ flowchart LR
 **3. Machine Learning Model**
 ```mermaid
 flowchart TD
-    Input[Training Vectors] --> RF[Random Forest Schema]
-    RF --> Eval[Model Scorer & Validator]
+    Input[Training Vectors] --> LGBM[LightGBM Schema]
+    LGBM --> Eval[Model Scorer & Validator]
     Eval --> Exporter[Joblib Exporter]
 ```
 
@@ -151,75 +151,69 @@ flowchart LR
 
 ## 10.2 Software Architecture General Description
 
-**Decoupled Microservice Architecture**
-The architecture is divided into three primary deployable artifacts: the React SPA Frontend, the Core FastAPI Backend, and the Machine Learning FastAPI Microservice. 
+**Decoupled Microservice and Pipeline Architecture**
+The OnTime architecture is fundamentally divided into two operational scopes: a synchronous, real-time microservice cluster (handling user routing) and an asynchronous, offline data pipeline (handling model training).
 
-**Rationale for Decomposition:**
-1. **Memory & Compute Isolation:** The core application operates on I/O-bound processes (database queries, network requests to MTA GTFS feeds), benefiting from asynchronous event loops. In contrast, the `ML Delay Prediction Service` needs to hold bulky static `joblib` models (e.g., Random Forest) and Scikit-Learn transformers in memory. Running them independently guarantees that CPU-heavy ML predictions do not block the concurrent network thread pool.
-2. **Horizontal Scalability:** The delay prediction engine can scale independently of the web-serving API gateway under heavy network load traffic.
-3. **Decoupled Frontend:** By serving the frontend via Vite/React independently, it can be hosted on a global CDN edge layer perfectly distinct from backend application processing.
+**Rationale for Component Decomposition:**
+1. **Offline vs. Online Processing (Data Modules vs. Live ML):** The *Data Collection Module* and *Data Preprocessing Module* are explicitly separated from the live system. Feature engineering on massive MTA datasets and fitting a LightGBM model are computationally expensive tasks. Isolating these as offline modules ensures the live *Machine Learning Model* only has to load static `.joblib` files, guaranteeing sub-second inference times for end users.
+2. **Memory & Compute Isolation (ML Model vs. Prediction API):** The *Prediction API* operates on I/O-bound processes (database queries, async network requests to MTA feeds), benefiting from high-concurrency event loops. In contrast, the *Machine Learning Model* executes CPU-bound mathematical operations using Scikit-Learn. Decomposing them guarantees that CPU-heavy ML predictions do not block the concurrent network thread pool, allowing both to scale horizontally at different rates.
+3. **Business Logic Separation (Recommendation Engine vs. API):** The *Recommendation Engine* encapsulates the complex Time-Weighted Dijkstra graph traversal and transfer penalty mathematics. By separating this from the *Prediction API*, the API acts strictly as a gateway (handling auth, JSON validation, and HTTP routing) while the Engine remains a pure logical module.
+4. **Decoupled User Experience (Web Application Interface):** By serving the *Web Application Interface* independently via React, it allows the client browser to handle computationally heavy Mapbox GL vector graphics, offloading spatial rendering entirely from the backend servers.
+5. **Environment Abstraction (Cloud Deployment Infrastructure):** Treating the *Cloud Deployment Infrastructure* as a separate component enforces the "Separation of Concerns" principle. It isolates container networking (Docker), database persistence (PostgreSQL), and reverse-proxy logic from the actual Python application code, ensuring the software can be redeployed across any cloud provider.
 
 ---
 
 ## 10.3 Software Item Components
 
-| Component | Functionality |
-| :--- | :--- |
-| **Frontend User Interface** | Captures user queries (locational data, preferred lines), displays the responsive Mapbox interface, and renders ranked dynamic itineraries. |
-| **Map Engine Component** | A localized instance wrapping Mapbox GL to project graph nodes and visual routing paths onto spatial map layers natively in the browser. |
-| **API Gateway / API Router** | Exposes the overarching REST API endpoints (`/plan`, `/live`, routes for users/auth). Funnels external internet traffic to specific backend sub-components and normalizes inputs using Pydantic models. |
-| **Security & Authentication** | Validates user identity using JWT bearer tokens. Enforces access controls for submitting user reviews or persisting favorite routes. |
-| **Subway Routing Engine** | Computes the mathematical shortest path using a custom Time-Weighted Dijkstra algorithm, integrating literal pedestrian traverse durations and inter-station transfer penalties. |
-| **GTFS Live Feed Integrator** | Connects dynamically to the MTA real-time GTFS feeds to replace static historical schedule waits with precise, live subway departures. |
-| **ML Delay Prediction Service** | Accepts formatted telemetry (date, cyclical hour, rush hour mapping, stops) and executes an inference tree to anticipate system-wide subway delays in seconds. |
-| **Database Session Manager** | Creates, pools, and gracefully terminates asynchronous `asyncpg` connections mapped to PostgreSQL schemas ensuring safe concurrency states. |
+**Web Application Interface**
+The frontend component captures user queries (locational data, preferred lines) and displays a responsive user interface. It leverages a localized Mapbox GL instance to project graph nodes and visual routing paths onto spatial map layers natively in the browser, rendering dynamic itineraries.
+
+**Prediction API**
+This component acts as the central API Gateway. It exposes the overarching REST endpoints (such as `/plan` and `/users`), validates incoming internet traffic using Pydantic schemas, and manages secure asynchronous database sessions using `asyncpg`. It also handles security and authentication by validating JWT bearer tokens for protected routes.
+
+**Recommendation Engine**
+The Recommendation Engine houses the core business logic. It computes the mathematical shortest path using a custom Time-Weighted Dijkstra algorithm, integrating literal pedestrian traverse durations and inter-station transfer penalties. It also dynamically queries external live feeds to replace static historical schedule waits with precise departures.
+
+**Machine Learning Model**
+Operating as an isolated service, this component accepts formatted telemetry (cyclical hour, rush hour mapping, stops) from the Recommendation Engine. It executes an inference tree on a static LightGBM model to anticipate system-wide subway delays in seconds, returning predictive weights to influence routing logic.
+
+**Data Collection Module** 
+An offline pipeline component responsible for systematically downloading historical MTA performance logs and transit telemetry. This module bridges the gap between external MTA open data systems and the application's internal raw storage repositories.
+
+**Data Preprocessing Module**
+A robust offline processing engine that sanitizes raw CSV data. It converts timestamps into cyclical trigonometric features, flags temporal categories like rush hours, and encodes string labels into numeric arrays. The output is a highly optimized vector store ready for model ingestion.
+
+**Cloud Deployment Infrastructure**
+This infrastructure layer manages the isolated Docker containers orchestrating the application. It provides the isolated environment for the PostgreSQL database engine to persist user data, network bridges for microservice communication, and persistent volumes for storing the deployment-ready ML models.
 
 ---
 
 ## 10.4 Component Interface Identification
 
-*Note: Interface IDs establish authoritative boundaries between the architecture's decoupled services.*
+Note: Interface IDs establish authoritative boundaries between the architecture's decoupled services.
 
-- **ID:** `IF-01`
-- **Name:** `SubmitRouteQuery`
-- **Description:** Sends validated origin/destination coordinates and user-defined constraints (preferred target line, max walking) securely over HTTPS via JSON payload.
-- **Component 1:** Frontend User Interface
-- **Component 2:** API Gateway / API Router
+Interface IF-01 is the SubmitRouteQuery. It sends validated origin and destination coordinates, along with user-defined constraints such as preferred target line and max walking distance. This interface connects the Web Application Interface to the Prediction API.
 
-- **ID:** `IF-02`
-- **Name:** `RequestDelayInference`
-- **Description:** Sends raw localized features asynchronously via internal Docker network HTTP POST; awaits a scalar prediction response matching the expected delay impact.
-- **Component 1:** Subway Routing Engine
-- **Component 2:** ML Delay Prediction Service
+Interface IF-02 is the RequestDelayInference. It sends raw localized features asynchronously via an internal Docker network HTTP POST request. It awaits a prediction response matching the expected delay impact. This interface connects the Recommendation Engine to the Machine Learning Model.
 
-- **ID:** `IF-03`
-- **Name:** `QueryLiveFeeds`
-- **Description:** Pulls aggregated protocol buffer files directly from the MTA server endpoint arrays, translating standard encoded GTFS data into workable application dictionaries.
-- **Component 1:** GTFS Live Feed Integrator
-- **Component 2:** External System (MTA API)
+Interface IF-03 is the QueryLiveFeeds. It pulls aggregated protocol buffer files directly from the MTA server endpoint arrays, translating encoded data into application dictionaries. This interface connects the Recommendation Engine to the external MTA API system.
 
-- **ID:** `IF-04`
-- **Name:** `PersistStateInteraction`
-- **Description:** Dispatches asynchronous SQL transactions to append or query favorite endpoints and user profile payloads.
-- **Component 1:** Database Session Manager
-- **Component 2:** Persistence Layer (PostgreSQL)
+Interface IF-04 is the PersistStateInteraction. It dispatches asynchronous SQL transactions to append or query user data. This interface bridges the Prediction API and the Cloud Deployment Infrastructure, specifically the PostgreSQL database layer.
 
 ---
 
 ## 10.5 Software Component Concept of Execution
 
-### API Gateway
-- **Motive / Event:** The user initiates an HTTP request directly to the server to establish an authenticated session or query for a transit route.
-- **Expected Outcome:** Validates the schema via Pydantic; routes the event to corresponding logic controllers and safely guarantees an HTTP 2xx or 4xx status response JSON is serialized and returned.
+The Web Application Interface execution is triggered when a user interacts with the browser application to submit origin coordinates, destination coordinates, and route preferences. The expected outcome is that the component captures this input, dispatches a network request to the backend, and subsequently renders the returned routing data onto a visual Mapbox projection.
 
-### Subway Routing Engine
-- **Motive / Event:** Received instructions from the API Gateway to fulfill a `/plan` POST constraint set containing coordinate matrices.
-- **Expected Outcome:** Iterates algorithmically through valid graph paths, pings the live feed and ML service for penalizations, and guarantees the return of a ranked JSON blob containing travel times, walking distances, and ordered routing lists.
+The Prediction API execution begins when an external HTTP request arrives from the frontend client. The component validates the incoming JSON payload against stringent Pydantic schemas. Its expected outcome is the successful routing of the event to internal logic controllers and the return of a standardized HTTP status response encapsulating the requested data.
 
-### ML Delay Prediction Service
-- **Motive / Event:** Awakens solely upon receiving a local HTTP callback trigger (`/predict`) from the backend architecture carrying standardized dictionary properties.
-- **Expected Outcome:** Parses the cyclic time identifiers through Scikit-Learn transformers, executes the `.predict()` wrapper on the static Random Forest schema, and returns normalized seconds of expected delay stringently mapped to the requested train line.
+The Recommendation Engine component is triggered upon receiving instructions from the Prediction API to calculate an optimal transit path. The expected outcome is that it traverses the subway graph using a Time-Weighted Dijkstra algorithm, requests predictive delay penalties, integrates live feed wait times, and returns a fully ranked list of itinerary candidates.
 
-### GTFS Live Feed Integrator
-- **Motive / Event:** Executed continuously as requested by the Routing Engine or asynchronously via the `/live` public API gateway ping.
-- **Expected Outcome:** Retrieves up-to-date protocol buffers, successfully extracting next-station wait times without thread blockage. Returns integer values representing immediate seconds-until-arrival.
+The Machine Learning Model execution is invoked asynchronously via an internal HTTP callback from the Recommendation Engine carrying feature dictionaries. The expected outcome is that the component processes cyclical time identifiers, executes an inference operation against a static LightGBM model, and returns the expected delay in seconds for the requested train line.
+
+The Data Collection Module execution is initiated manually by an administrator or on a cron schedule to update offline metrics. The expected outcome is the successful connection to external MTA open data endpoints, resulting in the download and storage of raw transit performance CSV files into the local dataset repository.
+
+The Data Preprocessing Module is triggered offline to process the raw datasets gathered by the collection module. The expected outcome is the sanitization of historical data, generation of trigonometric time features, and encoding of categorical string labels into a finalized vector format suitable for model training.
+
+The Cloud Deployment Infrastructure execution begins at the server initialization phase when the Docker Compose interface is launched. The expected outcome is the successful orchestration of all network bridges, the mounting of persistent database volumes, and the continuous background hosting of the PostgreSQL engine and containerized microservices.

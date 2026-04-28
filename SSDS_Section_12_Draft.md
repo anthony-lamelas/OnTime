@@ -15,11 +15,11 @@ flowchart TD
     end
 
     subgraph AWS [AWS Cloud Infrastructure]
-        subgraph EC2 [EC2 Production Instance<br/>Ubuntu Linux]
+        subgraph EC2 [Ubuntu Linux EC2 Instance]
             Certs[Let's Encrypt SSL Volume]
             DataVolume[(PostgreSQL Persistent Volume)]
 
-            subgraph Docker [Docker Engine Network]
+            subgraph Docker [Docker Engine]
                 Front[Nginx Reverse Proxy<br/>React SPA]
                 Back[Core FastAPI<br/>Application]
                 ML[LightGBM FastAPI<br/>Microservice]

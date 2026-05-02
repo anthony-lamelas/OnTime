@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel
+from datetime import datetime
 
 class StationOut(BaseModel):
     id: str
@@ -38,6 +39,7 @@ class PlanRequest(BaseModel):
     dest_lat: float
     dest_lon: float
     preferred_line: str | None = None
+    trip_datetime: datetime | None = None
 
 
 class PlanOut(BaseModel):

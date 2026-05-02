@@ -451,7 +451,8 @@ async def plan_trip(req: PlanRequest):
                 line_departures={},
             ),
         )
-        return PlansOut(routes=[RankedPlanOut(**fallback.model_dump(), score=1.0, lines=[])])
+        fallback_lines = list(dict.fromkeys(leg.line for leg in legs))
+        return PlansOut(routes=[RankedPlanOut(**fallback.model_dump(), score=1.0, lines=fallback_lines)])
 
     ranked = rank_routes(
         [c.model_dump() for c in candidates],

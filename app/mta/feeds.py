@@ -19,7 +19,8 @@ FEEDS: dict[str, str] = {
 
 LINE_TO_FEED: dict[str, str] = {
     "A": "ACE", "C": "ACE", "E": "ACE", "H": "ACE", "S": "ACE",
-    "B": "BDFM", "D": "BDFM", "F": "BDFM", "M": "BDFM",
+    "B": "BDFM", "D": "BDFM", "F": "BDFM", "M": "BDFM", "FS": "BDFM",
+    "GS": "1234567",
     "G": "G",
     "J": "JZ", "Z": "JZ",
     "N": "NQRW", "Q": "NQRW", "R": "NQRW", "W": "NQRW",

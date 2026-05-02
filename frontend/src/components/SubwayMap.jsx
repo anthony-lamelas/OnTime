@@ -17,7 +17,7 @@ const LINE_COLORS = {
   'J': '#996633', 'Z': '#996633',
   'L': '#A7A9AC',
   'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
-  'S': '#808183',
+  'S': '#808183', 'FS': '#808183', 'GS': '#808183', 'H': '#808183',
 }
 
 function getFastestLine(lineDepartures) {
@@ -95,9 +95,9 @@ export default function SubwayMap({
   const routeColor = LINE_COLORS[activeLine] ?? '#4f6ef7'
   const mapRef = useRef(null)
   const [subwayLines, setSubwayLines] = useState(null)
-  const [viewState, setViewState] = useState({ ...NYC_CENTER, zoom: 13.5, pitch: 45, bearing: -10 })
+  const [viewState, setViewState] = useState({ ...NYC_CENTER, zoom: 13.5, pitch: 0, bearing: 0 })
   const [selectedCandidate, setSelectedCandidate] = useState(null)
-  const [is3D, setIs3D] = useState(true)
+  const [is3D, setIs3D] = useState(false)
 
   const toggle3D = useCallback(() => {
     const next = !is3D
@@ -238,23 +238,6 @@ export default function SubwayMap({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  let routeGeoJSON = null
-  if (route?.found) {
-    try { routeGeoJSON = routeSubwayGeoJSON(route.stations, subwayLines) }
-    catch (e) { console.error('routeSubwayGeoJSON failed:', e) }
-    // Fallback: straight lines between stations until real geometry loads
-    if (!routeGeoJSON) {
-      const coords = route.stations
-        .filter(s => s.lon != null && s.lat != null)
-        .map(s => [s.lon, s.lat])
-      if (coords.length >= 2) {
-        routeGeoJSON = {
-          type: 'FeatureCollection',
-          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }],
-        }
-      }
-    }
-  }
   const userToStation  = walkLineGeoJSON(userLocation, userStation)
   const destToStation  = walkLineGeoJSON(destination, destStation)
 
@@ -510,26 +493,34 @@ export default function SubwayMap({
           </Source>
         )}
 
-        {/* Route — highlighted real subway track segments */}
-        {routeGeoJSON && (
-          <Source id="route" type="geojson" data={routeGeoJSON}>
-            {/* Outer glow */}
-            <Layer id="route-glow" type="line"
-              paint={{ 'line-color': routeColor, 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 6 }}
-              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            />
-            {/* Dark casing for contrast */}
-            <Layer id="route-casing" type="line"
-              paint={{ 'line-color': theme === 'light' ? '#fff' : '#0d1020', 'line-width': 9, 'line-opacity': 0.9 }}
-              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            />
-            {/* Main route line */}
-            <Layer id="route-line" type="line"
-              paint={{ 'line-color': routeColor, 'line-width': 5, 'line-opacity': 1 }}
-              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            />
-          </Source>
-        )}
+        {/* Per-leg route lines — each leg colored by its MTA line, drawn through station coords only */}
+        {route?.found && route.legs?.length > 0 && route.legs.map((leg, i) => {
+          const color = LINE_COLORS[leg.line] ?? '#4f6ef7'
+          const coords = leg.stations
+            .filter(s => s.lon != null && s.lat != null)
+            .map(s => [s.lon, s.lat])
+          if (coords.length < 2) return null
+          const geo = {
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }],
+          }
+          return (
+            <Source key={`leg-${i}`} id={`leg-${i}`} type="geojson" data={geo}>
+              <Layer id={`leg-glow-${i}`} type="line"
+                paint={{ 'line-color': color, 'line-width': 14, 'line-opacity': 0.18, 'line-blur': 6 }}
+                layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              />
+              <Layer id={`leg-casing-${i}`} type="line"
+                paint={{ 'line-color': theme === 'light' ? '#fff' : '#0d1020', 'line-width': 9, 'line-opacity': 0.9 }}
+                layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              />
+              <Layer id={`leg-line-${i}`} type="line"
+                paint={{ 'line-color': color, 'line-width': 5, 'line-opacity': 1 }}
+                layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              />
+            </Source>
+          )
+        })}
 
         {/* User location */}
         {userLocation && (
@@ -544,9 +535,28 @@ export default function SubwayMap({
         {/* Origin station ring */}
         {userStation?.lon && (
           <Marker longitude={userStation.lon} latitude={userStation.lat} anchor="center">
-            <div className={styles.stationMarker} style={{ borderColor: routeColor }} />
+            <div className={styles.stationMarker}
+              style={{ borderColor: LINE_COLORS[route?.legs?.[0]?.line] ?? routeColor }}
+            />
           </Marker>
         )}
+
+        {/* Transfer station markers — dual-color split ring at each line handoff */}
+        {route?.found && route.legs?.length > 1 && route.legs.slice(0, -1).map((leg, i) => {
+          const transfer = leg.stations[leg.stations.length - 1]
+          if (!transfer?.lon || !transfer?.lat) return null
+          const colorFrom = LINE_COLORS[leg.line] ?? '#4f6ef7'
+          const colorTo   = LINE_COLORS[route.legs[i + 1].line] ?? '#4f6ef7'
+          return (
+            <Marker key={`transfer-${i}`} longitude={transfer.lon} latitude={transfer.lat} anchor="center">
+              <div className={styles.transferMarker}>
+                <div className={styles.transferMarkerInner}
+                  style={{ background: `linear-gradient(135deg, ${colorFrom} 50%, ${colorTo} 50%)` }}
+                />
+              </div>
+            </Marker>
+          )
+        })}
 
         {/* Destination pin */}
         {destination?.lon && (

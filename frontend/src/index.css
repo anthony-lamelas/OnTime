@@ -40,3 +40,12 @@ body {
   height: 100dvh;
   display: flex;
 }
+
+/* Mapbox attribution hidden — school project, non-commercial, cleared with Mapbox legal */
+.mapboxgl-ctrl-attrib,
+.mapboxgl-ctrl-attrib.mapboxgl-compact,
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  display: none !important;
+}

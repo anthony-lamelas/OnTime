@@ -14,13 +14,16 @@ const LINE_COLORS = {
   'G': '#6CBE45', 'J': '#996633', 'Z': '#996633',
   'L': '#A7A9AC',
   'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
-  'S': '#808183',
+  'S': '#808183', 'FS': '#808183', 'GS': '#808183', 'H': '#808183',
 }
 
+const SHUTTLE_LINES = new Set(['FS', 'GS', 'H'])
+
 function LineBadge({ line }) {
+  const display = SHUTTLE_LINES.has(line) ? 'S' : line
   const bg = LINE_COLORS[line] || '#666'
   const color = bg === '#FCCC0A' ? '#000' : '#fff'
-  return <span className={styles.badge} style={{ background: bg, color }}>{line}</span>
+  return <span className={styles.badge} style={{ background: bg, color }}>{display}</span>
 }
 
 function OriginPicker({ origin, locating, locError, onRequestGPS, onOriginChange }) {
@@ -165,6 +168,9 @@ function TravelCard({ plan, selectedLine }) {
   const originWalkMin = Math.max(1, Math.round((origin_walk_km / 5) * 60))
   const destWalkMin = Math.max(1, Math.round((dest_walk_km / 5) * 60))
   const total = originWalkMin + (tt.wait_minutes ?? 5) + tt.transit_minutes + destWalkMin
+  const totalDisplay = total >= 60
+    ? { num: `${Math.floor(total / 60)}h ${total % 60}m`, label: '' }
+    : { num: total, label: 'min' }
   const legs = route?.legs ?? []
   const hasTransfers = legs.length > 1
 
@@ -173,8 +179,8 @@ function TravelCard({ plan, selectedLine }) {
       {/* Header: total time + line badges overview */}
       <div className={styles.travelHeader}>
         <div className={styles.travelTotal}>
-          <span className={styles.travelTotalNum}>{total}</span>
-          <span className={styles.travelTotalLabel}>min</span>
+          <span className={styles.travelTotalNum}>{totalDisplay.num}</span>
+          {totalDisplay.label && <span className={styles.travelTotalLabel}>{totalDisplay.label}</span>}
         </div>
         <div className={styles.travelLineSummary}>
           {legs.map((leg, i) => (

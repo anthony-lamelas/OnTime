@@ -333,7 +333,11 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
                 key={t.id}
                 trip={t}
                 isPast={false}
-                onSelect={() => { onSelectRoute(t.origin, t.destination); setView('home') }}
+                onSelect={() => {
+                  const dt = new Date(`${t.date}T${t.time}`)
+                  onSelectRoute(t.origin, t.destination, dt.toISOString())
+                  setView('home')
+                }}
                 onDelete={() => handleDelete(t.id)}
               />
             ))}
@@ -345,7 +349,11 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
                     key={t.id}
                     trip={t}
                     isPast
-                    onSelect={() => { onSelectRoute(t.origin, t.destination); setView('home') }}
+                    onSelect={() => {
+                      const dt = new Date(`${t.date}T${t.time}`)
+                      onSelectRoute(t.origin, t.destination, dt.toISOString())
+                      setView('home')
+                    }}
                     onDelete={() => handleDelete(t.id)}
                   />
                 ))}

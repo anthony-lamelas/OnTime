@@ -45,9 +45,18 @@ def _get_season(month: int) -> str:
     if month in [6, 7, 8]:  return "Summer"
     return "Fall"
 
-async def _get_delay_prediction(route_name: str, stop_id: str) -> float:
+def _get_direction_suffix(stop_ids: list, idx: int) -> str:
+    """
+    Guess N/S suffix based on position in path.
+    First half of route = outbound (S), second half = inbound (N).
+    This is a simplification — a proper fix needs actual direction from the graph.
+    """
+    midpoint = len(stop_ids) // 2
+    return "S" if idx < midpoint else "N"
+
+async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: datetime = None,) -> float:
     """Call ml_service and return predicted delay in minutes, default 0 on failure."""
-    now = datetime.now()
+    now = trip_datetime or datetime.now()
     payload = {
         "route_name":    route_name,
         "direction":     "1",
@@ -67,6 +76,23 @@ async def _get_delay_prediction(route_name: str, stop_id: str) -> float:
             return data["data"]["predicted_delay_minutes"]
     except Exception:
         return 0.0
+
+async def _get_delay_prediction_for_route(
+    route_name: str,
+    stop_ids: list[str],
+    trip_datetime: datetime = None,
+) -> float:
+    """Average delay prediction across all stops in the route path."""
+    import asyncio
+    clean_ids = [
+        (s[0] if isinstance(s, tuple) else s) + _get_direction_suffix(stop_ids, i)
+        for i, s in enumerate(stop_ids)
+    ]
+    predictions = await asyncio.gather(*[
+        _get_delay_prediction(route_name, stop_id, trip_datetime)
+        for stop_id in clean_ids
+    ])
+    return sum(predictions) / len(predictions) if predictions else 0.0
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 
@@ -238,6 +264,7 @@ class RankedPlanOut(BaseModel):
     travel_time: TravelTimeOut
     score: float
     lines: list[str]
+    predicted_delay_minutes: float
 
 class PlansOut(BaseModel):
     routes: list[RankedPlanOut]
@@ -372,6 +399,7 @@ async def plan_trip(req: PlanRequest):
     candidates = []
     signals_list = []
     line_names = []
+    delay_minutes_list = []
     seen_paths: set[tuple] = set()
 
     for line, dep in line_dep.items():
@@ -398,7 +426,7 @@ async def plan_trip(req: PlanRequest):
         total_min = o_walk_min + dep["minutes"] + transit_min + d_walk_min
         all_lines = list(dict.fromkeys(leg.line for leg in legs))  # ordered, deduplicated
 
-        delay_min = await _get_delay_prediction(line, r["o_station"]["id"])
+        delay_min = await _get_delay_prediction_for_route(line, r["path"], req.trip_datetime)
         delay_score = min(delay_min / 10.0, 1.0)
 
         candidate = PlanOut(
@@ -425,6 +453,7 @@ async def plan_trip(req: PlanRequest):
             safety_score=0.8,
             ml_confidence=0.9,
         ))
+        delay_minutes_list.append(round(delay_min, 1))
 
     # Fallback: use the globally-optimal path if no per-line routes produced candidates
     if not candidates:
@@ -461,7 +490,7 @@ async def plan_trip(req: PlanRequest):
 
     return PlansOut(
         routes=[
-            RankedPlanOut(**r, lines=[line_names[i]])
+            RankedPlanOut(**r, lines=[line_names[i]], predicted_delay_minutes=delay_minutes_list[i])
             for i, r in enumerate(ranked)
         ]
     )

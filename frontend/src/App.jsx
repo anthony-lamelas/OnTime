@@ -100,6 +100,8 @@ export default function App() {
   // Selected line at origin station (null = auto-pick fastest)
   const [selectedLine, setSelectedLine] = useState(null)
 
+  const [tripDatetime, setTripDatetime] = useState(null)
+
   // Request GPS location
   const requestGPS = useCallback(() => {
     if (!navigator.geolocation) {
@@ -137,6 +139,7 @@ export default function App() {
       dest_lon: destination.lon,
     }
     if (selectedLine) body.preferred_line = selectedLine
+    if (tripDatetime) body.trip_datetime = tripDatetime
     fetch('/api/subway/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -179,6 +182,7 @@ export default function App() {
     setSelectedLine(null)
     setCandidateLocations([])
     setAllRoutes([])
+    setTripDatetime(null)
   }, [])
 
   // Toggle: clicking the same line again deselects (reverts to auto-route)
@@ -201,12 +205,18 @@ export default function App() {
     handleDestChange(loc)
   }, [handleDestChange])
 
+  const handleTripSelect = useCallback((orig, dest, datetime) => {
+    setOrigin(orig)
+    setDestination(dest)
+    setTripDatetime(datetime)
+  }, [])
+
   // On mobile, snap sheet up when a destination is selected so trip info is visible
   useEffect(() => {
     if (isMobile && destination) {
       snapTo(snapPoints[1])
     }
-  }, [destination])
+  }, [origin, destination, selectedLine, tripDatetime])
 
   // Reset GPS and routing on view switch
   useEffect(() => {
@@ -284,7 +294,10 @@ export default function App() {
           setView={setCurrentView}
           isLoggedIn={isLoggedIn}
           setIsLoggedIn={setIsLoggedIn}
-          onSelectRoute={(orig, dest) => { setOrigin(orig); setDestination(dest) }}
+          onSelectRoute={(orig, dest, datetime) => {
+            handleTripSelect(orig, dest, datetime)
+            setCurrentView('home')
+          }}
         />
       )}
       {currentView === 'login' && (

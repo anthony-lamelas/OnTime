@@ -191,6 +191,7 @@ class RankedPlanOut(BaseModel):
     travel_time: TravelTimeOut
     score: float
     lines: list[str]
+    predicted_delay_minutes: float
 
 class PlansOut(BaseModel):
     routes: list[RankedPlanOut]
@@ -329,6 +330,7 @@ async def plan_trip(req: PlanRequest):
     candidates = []
     signals_list = []
     line_names = []
+    delay_minutes_list = []
 
     for line, dep in line_dep.items():
         delay_min = await _get_delay_prediction(line, r["o_station"]["id"])
@@ -358,6 +360,7 @@ async def plan_trip(req: PlanRequest):
             safety_score=0.8,
             ml_confidence=0.9,
         ))
+        delay_minutes_list.append(round(delay_min, 1))
 
     ranked = rank_routes(
         [c.model_dump() for c in candidates],
@@ -366,7 +369,7 @@ async def plan_trip(req: PlanRequest):
 
     return PlansOut(
         routes=[
-            RankedPlanOut(**r, lines=[line_names[i]])
+            RankedPlanOut(**r, lines=[line_names[i]], predicted_delay_minutes=delay_minutes_list[i])
             for i, r in enumerate(ranked)
         ]
     )

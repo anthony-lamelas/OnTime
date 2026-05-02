@@ -142,9 +142,22 @@ function StationChip({ station, label, walkKm, color, allRoutes, activePlan, onP
                   </span>
                   <span
                     className={styles.routeDelayBadge}
-                    style={{ background: delayBg, color: delayColor }}
+                    style={{
+                      background: route.predicted_delay_minutes < 0.5
+                        ? 'rgba(34,197,94,0.15)'
+                        : route.predicted_delay_minutes < 2
+                        ? 'rgba(251,146,60,0.15)'
+                        : 'rgba(239,68,68,0.15)',
+                      color: route.predicted_delay_minutes < 0.5 ? '#22c55e'
+                        : route.predicted_delay_minutes < 2 ? '#fb923c'
+                        : '#ef4444'
+                    }}
                   >
-                    {delayLabel}
+                    {route.predicted_delay_minutes < 0
+                      ? `${Math.abs(route.predicted_delay_minutes).toFixed(1)} min early`
+                      : route.predicted_delay_minutes < 0.5
+                      ? 'On time'
+                      : `+${route.predicted_delay_minutes.toFixed(1)} min`}
                   </span>
                   {isActive && <span className={styles.depSelected}>✓</span>}
                 </div>

@@ -1,0 +1,323 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,800&display=swap');
+
+/* ── Root ─────────────────────────────────────────── */
+.root {
+  width: 100%;
+  height: 100dvh;
+  background: #080b14;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+
+/* ── Map panel ────────────────────────────────────── */
+.mapPanel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.mapFade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    #080b14 0%,
+    rgba(8, 11, 20, 0.92) 22%,
+    rgba(8, 11, 20, 0.5) 55%,
+    rgba(8, 11, 20, 0.15) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ── Content ──────────────────────────────────────── */
+.content {
+  position: relative;
+  z-index: 10;
+  width: 52%;
+  max-width: 580px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 44px 52px 36px;
+}
+
+/* ── Header / Logo ────────────────────────────────── */
+.header {
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.logoSymbol {
+  font-size: 27px;
+  color: #4f6ef7;
+  line-height: 1;
+}
+
+.logoText {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.4px;
+}
+
+/* ── Hero ─────────────────────────────────────────── */
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 0 28px;
+}
+
+.eyebrow {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: #4f6ef7;
+  margin-bottom: 18px;
+}
+
+.tagline {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: clamp(42px, 5.5vw, 68px);
+  font-weight: 800;
+  line-height: 1.04;
+  color: #fff;
+  letter-spacing: -2px;
+  margin-bottom: 22px;
+}
+
+.description {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 380px;
+  margin-bottom: 40px;
+}
+
+/* ── CTA buttons ──────────────────────────────────── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: #fff;
+  color: #0d1020;
+  border: none;
+  border-radius: 13px;
+  padding: 15px 26px;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  letter-spacing: -0.1px;
+}
+
+.ctaPrimary:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 15px 22px;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
+}
+
+.ctaSecondary:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Feature pills ────────────────────────────────── */
+.pillRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 100px;
+  padding: 6px 13px;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+
+.pill::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot);
+  flex-shrink: 0;
+}
+
+/* ── Skip link ────────────────────────────────────── */
+.skipLink {
+  background: none;
+  border: none;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.skipLink:hover {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Footer ───────────────────────────────────────── */
+.footer {
+  flex-shrink: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.2px;
+}
+
+/* ── Mobile ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .root {
+    flex-direction: column;
+    background: #080b14;
+  }
+
+  /* Map stays full-screen behind everything on mobile */
+  .mapPanel {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .mapFade {
+    background: linear-gradient(
+      to bottom,
+      rgba(8, 11, 20, 0.15) 0%,
+      rgba(8, 11, 20, 0.55) 40%,
+      rgba(8, 11, 20, 0.92) 65%,
+      #080b14 85%
+    );
+  }
+
+  .content {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .header {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    right: 24px;
+  }
+
+  .hero {
+    flex: unset;
+    justify-content: flex-start;
+    padding: 0 24px 40px;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+  }
+
+  .tagline {
+    font-size: clamp(36px, 10vw, 50px);
+    letter-spacing: -1.5px;
+    margin-bottom: 12px;
+  }
+
+  .description {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    max-width: none;
+  }
+
+  .actions {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .ctaPrimary,
+  .ctaSecondary {
+    flex: 1;
+    justify-content: center;
+    min-height: 52px;
+    font-size: 15px;
+    border-radius: 14px;
+  }
+
+  .pillRow {
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .pill {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .skipLink {
+    font-size: 12px;
+  }
+
+  .footer {
+    display: none;
+  }
+}

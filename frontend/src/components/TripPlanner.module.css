@@ -275,67 +275,161 @@
   flex-shrink: 0;
 }
 
-.travelTotal {
+/* Header row: total time + line badge overview */
+.travelHeader {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 16px 16px 12px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--border);
 }
 
+.travelTotal {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .travelTotalNum {
-  font-size: 36px;
+  font-size: 34px;
   font-weight: 800;
   color: var(--accent);
   line-height: 1;
 }
 
 .travelTotalLabel {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--accent);
   line-height: 1;
-  margin-left: 2px;
 }
 
-.travelBreakdown {
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.travelStep {
+.travelLineSummary {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-}
-
-.travelIcon {
-  font-size: 15px;
-  width: 40px;
-  text-align: left;
-  flex-shrink: 0;
-}
-
-.travelStep span:nth-child(2) {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  min-width: 48px;
-}
-
-.travelStepLabel {
-  font-size: 12px;
-  color: var(--text-muted);
+  gap: 4px;
+  flex-wrap: wrap;
   flex: 1;
 }
 
-.travelDivider {
-  height: 1px;
-  background: var(--border);
-  margin: 2px 0 2px 34px;
+.travelLineSummaryItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.travelArrow {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Timeline */
+.timeline {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.timelineRow {
+  display: flex;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.timelineLeft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.timelineDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.timelineDotDest {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--text);
+  flex-shrink: 0;
+}
+
+.timelineLine {
+  width: 3px;
+  flex: 1;
+  min-height: 10px;
+  border-radius: 2px;
+  margin: 2px 0;
+}
+
+.timelineLineTall {
+  width: 3px;
+  min-height: 24px;
+  flex: 1;
+  border-radius: 2px;
+  margin: 2px 0;
+}
+
+.timelineContent {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.timelineStation {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timelineMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.timelineWalkIcon {
+  font-size: 12px;
+}
+
+.timelineWait {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timelineStopsLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 0 8px 0;
+  font-style: italic;
+}
+
+.timelineTransferTag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a855f7;
+  background: rgba(168,85,247,0.12);
+  border: 1px solid rgba(168,85,247,0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  width: fit-content;
 }
 
 .liveBadge {
@@ -343,6 +437,25 @@
   font-size: 11px;
   color: #22c55e;
   font-weight: 600;
+}
+
+.transferBadge {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 8px;
+  align-self: center;
+}
+
+.transferLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a855f7;
+  min-width: 48px;
 }
 
 /* No route */

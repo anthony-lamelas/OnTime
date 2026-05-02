@@ -4,11 +4,15 @@ import TripPlanner from './components/TripPlanner'
 import FavoritesPanel from './components/FavoritesPanel'
 import PlannedTripsPanel from './components/PlannedTripsPanel'
 import LoginPanel from './components/LoginPanel'
+import LandingPage from './pages/LandingPage'
+import SignupPage from './pages/SignupPage'
 import styles from './App.module.css'
 
 export default function App() {
   const [currentView, setCurrentView] = useState('home')
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('token'))
+  // 'landing' | 'signup' | 'login' | 'app'
+  const [page, setPage] = useState(() => localStorage.getItem('token') ? 'app' : 'landing')
   const [theme, setTheme] = useState('dark')
   const [sidebarWidth, setSidebarWidth] = useState(340)
   const dragging = useRef(false)
@@ -217,6 +221,29 @@ export default function App() {
 
   const activePrimaryLine = plan?.lines?.[0] ?? null
 
+  // ── Landing / auth pages ─────────────────────────
+  if (page === 'landing') {
+    return (
+      <LandingPage
+        onGetStarted={() => setPage('signup')}
+        onSignIn={() => setPage('login')}
+        onSkip={() => setPage('app')}
+      />
+    )
+  }
+
+  if (page === 'signup' || page === 'login') {
+    return (
+      <SignupPage
+        defaultMode={page === 'signup' ? 'register' : 'login'}
+        onSuccess={() => { setIsLoggedIn(true); setPage('app') }}
+        onBack={() => setPage('landing')}
+        onSkip={() => setPage('app')}
+      />
+    )
+  }
+
+  // ── Main app ─────────────────────────────────────
   // Shared panel content rendered in both mobile and desktop
   const panelContent = (
     <>

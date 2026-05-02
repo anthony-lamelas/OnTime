@@ -7,9 +7,9 @@ test('navigate authentication menus and assert map rendering', async ({ page }) 
    // Validate the app mounted properly without crashing
    await expect(page).toHaveTitle(/OnTime/);
    
-   // Open standard nav hooks validating components respond safely
-   await page.click('text=Login / Register');
-   
-   // Assert rendering
-   await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible();
+   // Landing page is shown first — click Sign in to reach auth screen
+   await page.click('text=Sign in');
+
+   // Assert auth screen rendered
+   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 });

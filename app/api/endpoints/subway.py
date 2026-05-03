@@ -10,6 +10,7 @@ from __future__ import annotations
 import heapq
 import json
 import math
+import os
 import httpx
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,8 @@ from pydantic import BaseModel
 from app.mta.feeds import get_live_subway_data, next_departure_minutes, departure_times_by_line
 from app.contracts.subway import StationOut, RouteOut, RouteLeg, TravelTimeOut, PlanRequest, PlanOut
 from app.services.route_scorer import RouteSignals, rank_routes
+
+ML_API_URL = os.getenv("ML_API_URL", "http://localhost:8001")
 
 router = APIRouter()
 
@@ -54,8 +57,11 @@ def _get_direction_suffix(stop_ids: list, idx: int) -> str:
     midpoint = len(stop_ids) // 2
     return "S" if idx < midpoint else "N"
 
-async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: datetime = None,) -> float:
-    """Call ml_service and return predicted delay in minutes, default 0 on failure."""
+async def _get_delay_prediction(
+    route_name: str,
+    stop_id: str,
+    trip_datetime: datetime = None,
+) -> float:
     now = trip_datetime or datetime.now()
     payload = {
         "route_name":    route_name,
@@ -71,7 +77,7 @@ async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: da
     }
     try:
         async with httpx.AsyncClient() as client:
-            r = await client.post("http://localhost:8001/predict", json=payload, timeout=2.0)
+            r = await client.post(f"{ML_API_URL}/predict", json=payload, timeout=2.0)
             data = r.json()
             return data["data"]["predicted_delay_minutes"]
     except Exception:

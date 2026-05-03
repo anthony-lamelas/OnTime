@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'ml_service/models/**'  # Only trigger when the models change
+      - 'ml_service/**'
 
 jobs:
   deploy:
@@ -41,4 +41,4 @@ jobs:
             docker rm -f ml_backend
             
             # Start the new container with auto-restart
-            docker run -d --name ml_backend -p 8000:8000 --restart unless-stopped ontime-ml
+            docker run -d --name ml_backend -p 8001:8000 --restart unless-stopped ontime-ml

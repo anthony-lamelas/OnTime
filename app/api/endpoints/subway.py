@@ -11,6 +11,7 @@ import heapq
 import json
 import math
 import httpx
+import importlib.util
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -21,6 +22,19 @@ from pydantic import BaseModel
 from app.mta.feeds import get_live_subway_data, next_departure_minutes, departure_times_by_line
 from app.contracts.subway import StationOut, RouteOut, RouteLeg, TravelTimeOut, PlanRequest, PlanOut
 from app.services.route_scorer import RouteSignals, rank_routes
+
+def _load_ml_model():
+    model_file = Path(__file__).parent.parent.parent.parent / "ml_service" / "model.py"
+    spec = importlib.util.spec_from_file_location("model", model_file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.JobLibModel()
+
+try:
+    _ml_model = _load_ml_model()
+except Exception as e:
+    print(f"Warning: ML model failed to load: {e}")
+    _ml_model = None
 
 router = APIRouter()
 
@@ -55,9 +69,10 @@ def _get_direction_suffix(stop_ids: list, idx: int) -> str:
     return "S" if idx < midpoint else "N"
 
 async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: datetime = None,) -> float:
-    """Call ml_service and return predicted delay in minutes, default 0 on failure."""
+    if _ml_model is None:
+        return 0.0
     now = trip_datetime or datetime.now()
-    payload = {
+    features = {
         "route_name":    route_name,
         "direction":     "1",
         "stop_id":       stop_id,
@@ -70,10 +85,8 @@ async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: da
         "count":         0,
     }
     try:
-        async with httpx.AsyncClient() as client:
-            r = await client.post("http://localhost:8001/predict", json=payload, timeout=2.0)
-            data = r.json()
-            return data["data"]["predicted_delay_minutes"]
+        result = _ml_model.predict(features)
+        return result["predicted_delay_minutes"]
     except Exception:
         return 0.0
 

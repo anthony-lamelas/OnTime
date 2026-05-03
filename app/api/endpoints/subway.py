@@ -57,11 +57,7 @@ def _get_direction_suffix(stop_ids: list, idx: int) -> str:
     midpoint = len(stop_ids) // 2
     return "S" if idx < midpoint else "N"
 
-async def _get_delay_prediction(
-    route_name: str,
-    stop_id: str,
-    trip_datetime: datetime = None,
-) -> float:
+async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: datetime = None,) -> float:
     now = trip_datetime or datetime.now()
     payload = {
         "route_name":    route_name,
@@ -83,11 +79,7 @@ async def _get_delay_prediction(
     except Exception:
         return 0.0
 
-async def _get_delay_prediction_for_route(
-    route_name: str,
-    stop_ids: list[str],
-    trip_datetime: datetime = None,
-) -> float:
+async def _get_delay_prediction_for_route(route_name: str, stop_ids: list[str], trip_datetime: datetime = None,) -> float:
     """Average delay prediction across all stops in the route path."""
     import asyncio
     clean_ids = [

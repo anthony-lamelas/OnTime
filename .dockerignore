@@ -1,0 +1,7 @@
+.git
+ml_service/data
+ml_service/notebooks
+ml_service/__pycache__
+frontend/node_modules
+**/__pycache__
+**/*.pyc

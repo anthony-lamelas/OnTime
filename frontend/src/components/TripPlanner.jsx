@@ -146,20 +146,30 @@ function StationChip({ station, label, walkKm, color, allRoutes, activePlan, onP
                   <span
                     className={styles.routeDelayBadge}
                     style={{
-                      background: route.predicted_delay_minutes < 0.5
+                      background: route.predicted_delay_minutes === null
+                        ? 'rgba(156,163,175,0.15)'
+                        : route.predicted_delay_minutes < 0.5
                         ? 'rgba(34,197,94,0.15)'
                         : route.predicted_delay_minutes < 2
                         ? 'rgba(251,146,60,0.15)'
                         : 'rgba(239,68,68,0.15)',
-                      color: route.predicted_delay_minutes < 0.5 ? '#22c55e'
+                      color: route.predicted_delay_minutes === null
+                        ? '#9ca3af'
+                        : route.predicted_delay_minutes < 0.5 ? '#22c55e'
                         : route.predicted_delay_minutes < 2 ? '#fb923c'
                         : '#ef4444'
                     }}
                   >
-                    {route.predicted_delay_minutes < 0
-                      ? `${Math.abs(route.predicted_delay_minutes).toFixed(1)} min early`
+                    {route.predicted_delay_minutes === null
+                      ? 'No prediction'
+                      : route.predicted_delay_minutes < 0
+                      ? (route.predicted_delay_minutes > -1 
+                          ? `${Math.round(Math.abs(route.predicted_delay_minutes * 60))}s early` 
+                          : `${Math.abs(route.predicted_delay_minutes).toFixed(1)} min early`)
                       : route.predicted_delay_minutes < 0.5
-                      ? 'On time'
+                      ? `On time (+${Math.round(route.predicted_delay_minutes * 60)}s)`
+                      : route.predicted_delay_minutes < 1
+                      ? `+${Math.round(route.predicted_delay_minutes * 60)}s`
                       : `+${route.predicted_delay_minutes.toFixed(1)} min`}
                   </span>
                   {isActive && <span className={styles.depSelected}>✓</span>}
@@ -251,6 +261,44 @@ function TravelCard({ plan, selectedLine }) {
                     {waitMin !== null && (
                       <span className={styles.timelineWait}>
                         {waitMin} min wait {tt.live ? <span className={styles.livePill}>live</span> : ''}
+                      </span>
+                    )}
+                    {leg.predicted_delay_minutes !== undefined && (
+                      <span
+                        className={styles.routeDelayBadge}
+                        style={{
+                          marginLeft: '8px',
+                          background: leg.predicted_delay_minutes === null
+                            ? 'rgba(156,163,175,0.15)'
+                            : leg.predicted_delay_minutes < 0.5
+                            ? 'rgba(34,197,94,0.15)'
+                            : leg.predicted_delay_minutes < 2
+                            ? 'rgba(251,146,60,0.15)'
+                            : 'rgba(239,68,68,0.15)',
+                          color: leg.predicted_delay_minutes === null
+                            ? '#9ca3af'
+                            : leg.predicted_delay_minutes < 0.5 ? '#22c55e'
+                            : leg.predicted_delay_minutes < 2 ? '#fb923c'
+                            : '#ef4444',
+                          padding: '2px 6px',
+                          fontSize: '11px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: '4px',
+                          fontWeight: 500
+                        }}
+                      >
+                        {leg.predicted_delay_minutes === null
+                          ? 'No prediction'
+                          : leg.predicted_delay_minutes < 0
+                          ? (leg.predicted_delay_minutes > -1 
+                              ? `${Math.round(Math.abs(leg.predicted_delay_minutes * 60))}s early` 
+                              : `${Math.abs(leg.predicted_delay_minutes).toFixed(1)} min early`)
+                          : leg.predicted_delay_minutes < 0.5
+                          ? `On time (+${Math.round(leg.predicted_delay_minutes * 60)}s)`
+                          : leg.predicted_delay_minutes < 1
+                          ? `+${Math.round(leg.predicted_delay_minutes * 60)}s`
+                          : `+${leg.predicted_delay_minutes.toFixed(1)} min`}
                       </span>
                     )}
                   </span>

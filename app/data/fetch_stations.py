@@ -137,6 +137,20 @@ def main():
     with open(OUT_DIR / "subway_graph.json", "w") as f:
         json.dump(dict(graph), f)
 
+    # Compute average stop sequence per route per stop
+    route_stop_seq = defaultdict(list)
+    for tid, stops in trip_seq.items():
+        rid = trip_to_route[tid]
+        for seq, sid, _ in stops:
+            route_stop_seq[f"{rid}_{sid}"].append(seq)
+
+    stop_sequences = {}
+    for key, seqs in route_stop_seq.items():
+        stop_sequences[key] = int(round(sum(seqs) / len(seqs)))
+
+    with open(OUT_DIR / "stop_sequences.json", "w") as f:
+        json.dump(stop_sequences, f)
+
 
 if __name__ == "__main__":
     main()

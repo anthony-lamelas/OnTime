@@ -22,6 +22,13 @@ async def create_favorite_route(
     """
     Create a new favorite route
     """
+    existing = await db.fetchval(
+        "SELECT id FROM favorite_routes WHERE user_id = $1 AND origin::jsonb = $2::jsonb AND destination::jsonb = $3::jsonb",
+        current_user.id, json.dumps(favorite_route.origin), json.dumps(favorite_route.destination)
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Favorite route already exists")
+
     route_id = await db.fetchval(
         "INSERT INTO favorite_routes (user_id, name, origin, destination) VALUES ($1, $2, $3, $4) RETURNING id",
         current_user.id, favorite_route.name, json.dumps(favorite_route.origin), json.dumps(favorite_route.destination)
@@ -67,6 +74,13 @@ async def create_favorite_location(
     """
     Create a new favorite location
     """
+    existing = await db.fetchval(
+        "SELECT id FROM favorite_locations WHERE user_id = $1 AND location::jsonb = $2::jsonb",
+        current_user.id, json.dumps(favorite_location.location)
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Favorite location already exists")
+
     loc_id = await db.fetchval(
         "INSERT INTO favorite_locations (user_id, name, location) VALUES ($1, $2, $3) RETURNING id", 
         current_user.id, favorite_location.name, json.dumps(favorite_location.location)

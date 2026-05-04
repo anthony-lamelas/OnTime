@@ -9,7 +9,7 @@ def test_create_planned_trip(mock_db_session):
         {"id": MOCK_USER_ID, "hashed_password": MOCK_USER_HASHED},
         {"id": MOCK_USER_ID, "email": MOCK_USER_EMAIL}
     ]
-    mock_db_session.fetchval.return_value = 300
+    mock_db_session.fetchval.side_effect = [None, 300]
     
     login_response = client.post("/api/auth/login", data={"username": MOCK_USER_EMAIL, "password": MOCK_USER_PASSWORD})
     token = login_response.json()["access_token"]

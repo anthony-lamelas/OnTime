@@ -19,6 +19,13 @@ async def create_planned_trip(
     """
     Create a new planned trip
     """
+    existing = await db.fetchval(
+        "SELECT id FROM planned_trips WHERE user_id = $1 AND origin::jsonb = $2::jsonb AND destination::jsonb = $3::jsonb AND trip_date = $4 AND trip_time = $5",
+        current_user.id, json.dumps(planned_trip.origin), json.dumps(planned_trip.destination), planned_trip.date, planned_trip.time
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Planned trip already exists")
+
     trip_id = await db.fetchval(
         "INSERT INTO planned_trips (user_id, origin, destination, trip_date, trip_time) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         current_user.id, json.dumps(planned_trip.origin), json.dumps(planned_trip.destination), planned_trip.date, planned_trip.time

@@ -212,13 +212,16 @@ export default function PlannedTripsPanel({ setView, isLoggedIn, setIsLoggedIn, 
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ origin: formData.origin, destination: formData.destination, date, time }),
       })
-      if (!res.ok) throw new Error('Failed to save')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Failed to save')
+      }
       const trip = await res.json()
       setTrips(prev => [trip, ...prev])
       setIsAdding(false)
       setFormData({ origin: null, destination: null, dateMonth: '', dateDay: '', dateYear: '', timeHour: '9', timeMinute: '00', timeAmpm: 'AM' })
-    } catch {
-      setError('Could not save trip. Try again.')
+    } catch (err) {
+      setError(err.message || 'Could not save trip. Try again.')
     }
   }
 

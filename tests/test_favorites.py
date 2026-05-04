@@ -11,7 +11,7 @@ def test_create_favorite_route(mock_db_session):
         {"id": MOCK_USER_ID, "email": MOCK_USER_EMAIL} 
     ]
     
-    mock_db_session.fetchval.return_value = 100 
+    mock_db_session.fetchval.side_effect = [None, 100] 
     
     login_response = client.post("/api/auth/login", data={"username": MOCK_USER_EMAIL, "password": MOCK_USER_PASSWORD})
     token = login_response.json()["access_token"]
@@ -64,7 +64,7 @@ def test_create_favorite_location(mock_db_session):
         {"id": MOCK_USER_ID, "hashed_password": MOCK_USER_HASHED},
         {"id": MOCK_USER_ID, "email": MOCK_USER_EMAIL}
     ]
-    mock_db_session.fetchval.return_value = 200
+    mock_db_session.fetchval.side_effect = [None, 200]
     
     login_response = client.post("/api/auth/login", data={"username": MOCK_USER_EMAIL, "password": MOCK_USER_PASSWORD})
     token = login_response.json()["access_token"]

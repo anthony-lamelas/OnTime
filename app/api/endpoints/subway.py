@@ -29,10 +29,12 @@ router = APIRouter()
 
 STATIONS_FILE = Path(__file__).parent.parent.parent / "data" / "stations.json"
 GRAPH_FILE    = Path(__file__).parent.parent.parent / "data" / "subway_graph.json"
+STOP_SEQUENCES_FILE = Path(__file__).parent.parent.parent / "data" / "stop_sequences.json"
 
 _stations_cache: list[dict] | None = None
 # graph: { station_id: { neighbor_id: { "time_sec": int, "lines": [str] } } }
 _graph_cache: dict[str, dict] | None = None
+_stop_sequences_cache: dict[str, int] | None = None
 
 # Routing constants
 TRANSFER_PENALTY_SEC  = 240   # 4 min penalty for changing lines at a transfer station
@@ -59,6 +61,11 @@ def _get_direction_suffix(stop_ids: list, idx: int) -> str:
 
 async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: datetime = None,) -> float:
     now = trip_datetime or datetime.now()
+    _load_stations()
+    base_stop_id = stop_id.rstrip("NS")
+    seq_key = f"{route_name}_{base_stop_id}"
+    actual_seq = _stop_sequences_cache.get(seq_key, 1) if _stop_sequences_cache else 1
+
     payload = {
         "route_name":    route_name,
         "direction":     "1",
@@ -67,7 +74,7 @@ async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: da
         "hour":          now.hour,
         "month":         now.month,
         "year":          now.year,
-        "stop_sequence": 1,
+        "stop_sequence": actual_seq,
         "season":        _get_season(now.month),
         "count":         0,
     }
@@ -76,10 +83,11 @@ async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: da
             r = await client.post(f"{ML_API_URL}/predict", json=payload, timeout=2.0)
             data = r.json()
             return data["data"]["predicted_delay_minutes"]
-    except Exception:
-        return 0.0
+    except Exception as e:
+        print(f"ML API Error: {e}")
+        return None
 
-async def _get_delay_prediction_for_route(route_name: str, stop_ids: list[str], trip_datetime: datetime = None,) -> float:
+async def _get_delay_prediction_for_route(route_name: str, stop_ids: list[str], trip_datetime: datetime = None,) -> Optional[float]:
     """Average delay prediction across all stops in the route path."""
     import asyncio
     clean_ids = [
@@ -90,22 +98,28 @@ async def _get_delay_prediction_for_route(route_name: str, stop_ids: list[str], 
         _get_delay_prediction(route_name, stop_id, trip_datetime)
         for stop_id in clean_ids
     ])
-    return sum(predictions) / len(predictions) if predictions else 0.0
+    valid_predictions = [p for p in predictions if p is not None]
+    return sum(valid_predictions) / len(valid_predictions) if valid_predictions else None
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# Data loading
 
 def _load_stations() -> list[dict]:
-    global _stations_cache, _graph_cache
+    global _stations_cache, _graph_cache, _stop_sequences_cache
     if _stations_cache is not None:
         return _stations_cache
     with open(STATIONS_FILE) as f:
         _stations_cache = json.load(f)
     with open(GRAPH_FILE) as f:
         _graph_cache = json.load(f)
+    if STOP_SEQUENCES_FILE.exists():
+        with open(STOP_SEQUENCES_FILE) as f:
+            _stop_sequences_cache = json.load(f)
+    else:
+        _stop_sequences_cache = {}
     return _stations_cache
 
 
-# ── Geometry ──────────────────────────────────────────────────────────────────
+# Geometry 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
@@ -169,8 +183,6 @@ def _stations_within(lat: float, lon: float, max_km: float,
     return result
 
 
-# ── Dijkstra ──────────────────────────────────────────────────────────────────
-
 def _dijkstra(
     origin_id: str,
     dest_id: str,
@@ -209,7 +221,6 @@ def _dijkstra(
         if restricted:   # only restrict if preferred line actually serves this station
             origin_lines = restricted
 
-    # heap entries: (cost_sec, station_id, current_line, path)
     # path is a list of (station_id, line) tuples to track which line each hop uses
     pq: list = []
     best: dict[tuple, int] = {}
@@ -251,8 +262,6 @@ def _dijkstra(
     return None  # no path
 
 
-# ── API models ────────────────────────────────────────────────────────────────
-
 class RankedPlanOut(BaseModel):
     origin_station: StationOut
     dest_station: StationOut
@@ -262,13 +271,11 @@ class RankedPlanOut(BaseModel):
     travel_time: TravelTimeOut
     score: float
     lines: list[str]
-    predicted_delay_minutes: float
+    predicted_delay_minutes: Optional[float]
 
 class PlansOut(BaseModel):
     routes: list[RankedPlanOut]
 
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/stations", response_model=list[StationOut])
 def get_stations():
@@ -343,8 +350,7 @@ async def plan_trip(req: PlanRequest):
         for i, (_, s) in enumerate(origin_candidates)
     }
 
-    # ── Step 1: Find the best (origin, dest) pair with no line preference ────
-    # This gives us the globally optimal route to anchor on.
+    # Find the best (origin, dest) pair with no line preference
     best_total = float("inf")
     best_result = None
 
@@ -383,9 +389,7 @@ async def plan_trip(req: PlanRequest):
 
     r = best_result
 
-    # ── Step 2: Run per-line Dijkstra for the best origin/dest pair ──────────
-    # Each line at the origin gets its own Dijkstra so routes genuinely differ
-    # when lines take different paths (e.g. A express vs C local).
+    # Run per-line Dijkstra for the best origin/dest pair 
     line_dep = await departure_times_by_line(
         r["o_station"]["id"],
         r["o_station"].get("lines", [])
@@ -424,8 +428,18 @@ async def plan_trip(req: PlanRequest):
         total_min = o_walk_min + dep["minutes"] + transit_min + d_walk_min
         all_lines = list(dict.fromkeys(leg.line for leg in legs))  # ordered, deduplicated
 
-        delay_min = await _get_delay_prediction_for_route(line, r["path"], req.trip_datetime)
-        delay_score = min(delay_min / 10.0, 1.0)
+        import asyncio
+        leg_delay_tasks = [
+            _get_delay_prediction_for_route(leg.line, [s.id for s in leg.stations], req.trip_datetime)
+            for leg in legs
+        ]
+        leg_delays = await asyncio.gather(*leg_delay_tasks)
+        for leg, delay in zip(legs, leg_delays):
+            leg.predicted_delay_minutes = delay
+
+        valid_delays = [d for d in leg_delays if d is not None]
+        delay_min = sum(valid_delays) if valid_delays else None
+        delay_score = min(delay_min / 10.0, 1.0) if delay_min is not None else 0.5
 
         candidate = PlanOut(
             origin_station=StationOut(**r["o_station"]),
@@ -442,8 +456,11 @@ async def plan_trip(req: PlanRequest):
                 line_departures=line_dep,
             ),
         )
-        candidates.append(candidate)
-        line_names.append(line)
+        cand_dict = candidate.model_dump()
+        cand_dict["lines"] = [line]
+        cand_dict["predicted_delay_minutes"] = round(delay_min, 1) if delay_min is not None else None
+        candidates.append(cand_dict)
+
         signals_list.append(RouteSignals(
             eta_minutes=float(total_min),
             delay_probability=delay_score,
@@ -451,7 +468,6 @@ async def plan_trip(req: PlanRequest):
             safety_score=0.8,
             ml_confidence=0.9,
         ))
-        delay_minutes_list.append(round(delay_min, 1))
 
     # Fallback: use the globally-optimal path if no per-line routes produced candidates
     if not candidates:
@@ -479,17 +495,17 @@ async def plan_trip(req: PlanRequest):
             ),
         )
         fallback_lines = list(dict.fromkeys(leg.line for leg in legs))
-        return PlansOut(routes=[RankedPlanOut(**fallback.model_dump(), score=1.0, lines=fallback_lines)])
+        return PlansOut(routes=[RankedPlanOut(**fallback.model_dump(), score=1.0, lines=fallback_lines, predicted_delay_minutes=None)])
 
     ranked = rank_routes(
-        [c.model_dump() for c in candidates],
+        candidates,
         signals_list
     )
 
     return PlansOut(
         routes=[
-            RankedPlanOut(**r, lines=[line_names[i]], predicted_delay_minutes=delay_minutes_list[i])
-            for i, r in enumerate(ranked)
+            RankedPlanOut(**r)
+            for r in ranked
         ]
     )
 

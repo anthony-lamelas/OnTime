@@ -1,0 +1,6 @@
+# ml_service/.dockerignore
+data/
+notebooks/
+__pycache__/
+*.pyc
+*.ipynb

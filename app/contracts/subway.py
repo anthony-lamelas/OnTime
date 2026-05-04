@@ -15,6 +15,7 @@ class RouteLeg(BaseModel):
     line: str
     stations: list[StationOut]
     stops: int
+    predicted_delay_minutes: Optional[float] = None
 
 
 class RouteOut(BaseModel):

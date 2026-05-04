@@ -13,6 +13,8 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
   
   const [routeForm, setRouteForm] = useState({ name: '', origin: null, destination: null })
   const [locationForm, setLocationForm] = useState({ name: '', location: null })
+  const [routeError, setRouteError] = useState(null)
+  const [locationError, setLocationError] = useState(null)
 
   const fetchFavorites = async () => {
     const token = localStorage.getItem('token')
@@ -77,12 +79,13 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
 
   const handleAddRoute = async (e) => {
     e.preventDefault()
+    setRouteError(null)
     const token = localStorage.getItem('token')
     if (!token) return
 
     try {
       if (!routeForm.origin || !routeForm.destination) {
-        alert("Please select valid locations from the dropdown searches.")
+        setRouteError("Please select valid locations from the dropdown searches.")
         return
       }
       const payload = {
@@ -99,25 +102,30 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
         },
         body: JSON.stringify(payload)
       })
-      if (!res.ok) throw new Error('Failed to save route')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Failed to save route')
+      }
       const data = await res.json()
       setRoutes([data, ...routes])
       
       setIsAddingRoute(false)
       setRouteForm({ name: '', origin: null, destination: null })
     } catch (err) {
+      setRouteError(err.message)
       console.error(err)
     }
   }
 
   const handleAddLocation = async (e) => {
     e.preventDefault()
+    setLocationError(null)
     const token = localStorage.getItem('token')
     if (!token) return
 
     try {
       if (!locationForm.location) {
-        alert("Please select a valid location from the dropdown search.")
+        setLocationError("Please select a valid location from the dropdown search.")
         return
       }
       const payload = {
@@ -133,13 +141,17 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
         },
         body: JSON.stringify(payload)
       })
-      if (!res.ok) throw new Error('Failed to save location')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Failed to save location')
+      }
       const data = await res.json()
       setLocations([data, ...locations])
       
       setIsAddingLocation(false)
       setLocationForm({ name: '', location: null })
     } catch (err) {
+      setLocationError(err.message)
       console.error(err)
     }
   }
@@ -169,6 +181,7 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
           
           {isAddingRoute && (
             <form className={favStyles.addForm} onSubmit={handleAddRoute}>
+              {routeError && <div className={favStyles.formError}>{routeError}</div>}
               <div className={favStyles.inputGroup}>
                 <label>Name</label>
                 <input type="text" required value={routeForm.name} onChange={e => setRouteForm({...routeForm, name: e.target.value})} placeholder="e.g. Home to Work" />
@@ -220,6 +233,7 @@ export default function FavoritesPanel({ setView, isLoggedIn, setIsLoggedIn, onS
 
           {isAddingLocation && (
             <form className={favStyles.addForm} onSubmit={handleAddLocation}>
+              {locationError && <div className={favStyles.formError}>{locationError}</div>}
               <div className={favStyles.inputGroup}>
                 <label>Name</label>
                 <input type="text" required value={locationForm.name} onChange={e => setLocationForm({...locationForm, name: e.target.value})} placeholder="e.g. Central Park" />

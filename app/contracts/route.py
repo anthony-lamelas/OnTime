@@ -2,10 +2,7 @@ from pydantic import BaseModel
 
 class RouteSignalSchema(BaseModel):
     eta_minutes: float
-    delay_probability: float
-    preference_score: float
-    safety_score: float
-    ml_confidence: float
+    predicted_delay_minutes: float
 
 class RouteRequest(BaseModel):
     candidates: list[dict]

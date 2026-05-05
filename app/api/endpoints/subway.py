@@ -7,9 +7,10 @@ NYC Subway trip planner endpoint.
 """
 from __future__ import annotations
 
+import asyncio
+import heapq
 import heapq
 import json
-import math
 import os
 import httpx
 from pathlib import Path
@@ -22,6 +23,11 @@ from pydantic import BaseModel
 from app.mta.feeds import get_live_subway_data, next_departure_minutes, departure_times_by_line
 from app.contracts.subway import StationOut, RouteOut, RouteLeg, TravelTimeOut, PlanRequest, PlanOut
 from app.services.route_scorer import RouteSignals, rank_routes
+from app.services.routing import (
+    TRANSFER_PENALTY_SEC, WALK_SPEED_KMH, MAX_WALK_ORIGIN_KM, MAX_WALK_DEST_KM,
+    MAX_ORIGIN_CANDIDATES, MAX_DEST_CANDIDATES,
+    _haversine_km, _walk_seconds, _extract_legs, _stations_within, _dijkstra
+)
 
 ML_API_URL = os.getenv("ML_API_URL", "http://localhost:8001")
 
@@ -35,14 +41,6 @@ _stations_cache: list[dict] | None = None
 # graph: { station_id: { neighbor_id: { "time_sec": int, "lines": [str] } } }
 _graph_cache: dict[str, dict] | None = None
 _stop_sequences_cache: dict[str, int] | None = None
-
-# Routing constants
-TRANSFER_PENALTY_SEC  = 240   # 4 min penalty for changing lines at a transfer station
-WALK_SPEED_KMH        = 5.0
-MAX_WALK_ORIGIN_KM    = 1.5   # consider origin stations up to 1.5 km away
-MAX_WALK_DEST_KM      = 1.5   # consider destination stations up to 1.5 km away
-MAX_ORIGIN_CANDIDATES = 6     # max walkable origin stations to evaluate
-MAX_DEST_CANDIDATES   = 5
 
 def _get_season(month: int) -> str:
     if month in [12, 1, 2]: return "Winter"
@@ -89,7 +87,6 @@ async def _get_delay_prediction(route_name: str, stop_id: str, trip_datetime: da
 
 async def _get_delay_prediction_for_route(route_name: str, stop_ids: list[str], trip_datetime: datetime = None,) -> Optional[float]:
     """Average delay prediction across all stops in the route path."""
-    import asyncio
     clean_ids = [
         (s[0] if isinstance(s, tuple) else s) + _get_direction_suffix(stop_ids, i)
         for i, s in enumerate(stop_ids)
@@ -117,149 +114,6 @@ def _load_stations() -> list[dict]:
     else:
         _stop_sequences_cache = {}
     return _stations_cache
-
-
-# Geometry 
-
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371.0
-    d_lat = math.radians(lat2 - lat1)
-    d_lon = math.radians(lon2 - lon1)
-    a = (math.sin(d_lat / 2) ** 2
-         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
-         * math.sin(d_lon / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-
-def _walk_seconds(dist_km: float) -> int:
-    return int((dist_km / WALK_SPEED_KMH) * 3600)
-
-
-def _extract_legs(
-    path_with_lines: list[tuple[str, str]],
-    station_map: dict[str, dict],
-) -> list[RouteLeg]:
-    """
-    Group a path of (station_id, line) tuples into RouteLeg segments.
-    Each leg is one continuous run on a single line.
-    """
-    if not path_with_lines:
-        return []
-
-    legs: list[RouteLeg] = []
-    cur_line = path_with_lines[0][1]
-    cur_stations: list[StationOut] = []
-
-    for sid, line in path_with_lines:
-        if line != cur_line and cur_stations:
-            # Line changed — close the current leg
-            legs.append(RouteLeg(line=cur_line, stations=cur_stations, stops=len(cur_stations) - 1))
-            cur_line = line
-            # The transfer station starts the next leg too
-            cur_stations = [cur_stations[-1]]
-
-        if not cur_stations or cur_stations[-1].id != sid:
-            station = station_map.get(sid)
-            if station:
-                cur_stations.append(StationOut(**station))
-
-    if cur_stations:
-        legs.append(RouteLeg(line=cur_line, stations=cur_stations, stops=len(cur_stations) - 1))
-
-    return legs
-
-
-def _stations_within(lat: float, lon: float, max_km: float,
-                     stations: list[dict], graph: dict) -> list[tuple[float, dict]]:
-    """Return [(dist_km, station)] for stations within max_km that exist in the graph."""
-    result = []
-    for s in stations:
-        if not s.get("lat") or not s.get("lon") or s["id"] not in graph:
-            continue
-        d = _haversine_km(lat, lon, s["lat"], s["lon"])
-        if d <= max_km:
-            result.append((d, s))
-    result.sort(key=lambda x: x[0])
-    return result
-
-
-def _dijkstra(
-    origin_id: str,
-    dest_id: str,
-    graph: dict,
-    initial_wait_sec: int = 300,
-    preferred_lines: frozenset | None = None,
-) -> tuple[list[str], int] | None:
-    """
-    Time-weighted Dijkstra.
-
-    State: (cost_sec, station_id, current_line)  — one state per (station, line) pair.
-    - Continuing on the same line: add edge travel time only.
-    - Switching to a different line (transfer): add travel time + TRANSFER_PENALTY_SEC.
-
-    Using a single current_line (not a frozenset) avoids state-space explosion where
-    frozenset({'2'}) and frozenset({'2','3'}) at the same station were treated as
-    separate, incomparable states — causing the algorithm to miss optimal transfers.
-
-    Returns (path_of_station_ids, total_transit_seconds) or None.
-    """
-    if origin_id == dest_id:
-        line = next(iter(
-            line for nbr_data in graph.get(origin_id, {}).values()
-            for line in nbr_data.get("lines", [])
-        ), "?")
-        return [(origin_id, line)], 0
-
-    # All lines that serve the origin station (via its outgoing edges)
-    origin_lines = set(
-        line
-        for nbr_data in graph.get(origin_id, {}).values()
-        for line in nbr_data.get("lines", [])
-    )
-    if preferred_lines:
-        restricted = origin_lines & preferred_lines
-        if restricted:   # only restrict if preferred line actually serves this station
-            origin_lines = restricted
-
-    # path is a list of (station_id, line) tuples to track which line each hop uses
-    pq: list = []
-    best: dict[tuple, int] = {}
-    for line in origin_lines:
-        state = (origin_id, line)
-        best[state] = initial_wait_sec
-        heapq.heappush(pq, (initial_wait_sec, origin_id, line, [(origin_id, line)]))
-
-    while pq:
-        cost, node, cur_line, path = heapq.heappop(pq)
-
-        if node == dest_id:
-            return path, cost
-
-        state = (node, cur_line)
-        if cost > best.get(state, float("inf")):
-            continue
-
-        for nbr, edge in graph.get(node, {}).items():
-            t_sec      = edge.get("time_sec", 120)
-            edge_lines = edge.get("lines", [])
-
-            if cur_line in edge_lines:
-                # Continue on the same line — no transfer penalty
-                new_cost = cost + t_sec
-                new_state = (nbr, cur_line)
-                if new_cost < best.get(new_state, float("inf")):
-                    best[new_state] = new_cost
-                    heapq.heappush(pq, (new_cost, nbr, cur_line, path + [(nbr, cur_line)]))
-            else:
-                # Transfer: board each line this edge serves, pay penalty once
-                for new_line in edge_lines:
-                    new_cost = cost + t_sec + TRANSFER_PENALTY_SEC
-                    new_state = (nbr, new_line)
-                    if new_cost < best.get(new_state, float("inf")):
-                        best[new_state] = new_cost
-                        heapq.heappush(pq, (new_cost, nbr, new_line, path + [(nbr, new_line)]))
-
-    return None  # no path
 
 
 class RankedPlanOut(BaseModel):
@@ -338,7 +192,6 @@ async def plan_trip(req: PlanRequest):
         raise HTTPException(status_code=404, detail="No station near destination")
 
     # Fetch live wait times for each candidate origin station (concurrently)
-    import asyncio
     async def _get_wait(s: dict) -> int:
         w = await next_departure_minutes(s["id"], s.get("lines", []))
         return w * 60 if w is not None else 300   # default 5 min
@@ -427,8 +280,6 @@ async def plan_trip(req: PlanRequest):
         transit_min = max(1, round(pure_transit_sec / 60))
         total_min = o_walk_min + dep["minutes"] + transit_min + d_walk_min
         all_lines = list(dict.fromkeys(leg.line for leg in legs))  # ordered, deduplicated
-
-        import asyncio
         leg_delay_tasks = [
             _get_delay_prediction_for_route(leg.line, [s.id for s in leg.stations], req.trip_datetime)
             for leg in legs

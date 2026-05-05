@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.schemas.route import RouteRequest, RouteResponse
+from app.contracts.route import RouteRequest, RouteResponse
 from app.services.route_scorer import rank_routes, RouteSignals
 
 router = APIRouter()

@@ -1,4 +1,5 @@
 import asyncio
+import time as _time
 from typing import Optional
 
 import httpx
@@ -165,7 +166,6 @@ async def next_departure_minutes(stop_id: str, lines: list[str]) -> int | None:
 
     Returns None if no live data is available.
     """
-    import time as _time
 
     feed_keys = list({LINE_TO_FEED[l] for l in lines if l in LINE_TO_FEED})
     if not feed_keys:
@@ -211,8 +211,6 @@ async def departure_times_by_line(
 
     Falls back to {"minutes": 5, "live": False} for lines with no live data.
     """
-    import time as _time
-
     feed_keys = list({LINE_TO_FEED[l] for l in lines if l in LINE_TO_FEED})
     per_line: dict[str, int | None] = {l: None for l in lines if l in LINE_TO_FEED}
 

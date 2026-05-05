@@ -132,6 +132,41 @@ cd frontend
 npm run test:e2e
 ```
 
+---
+
+## Running the Auto-Fetching and Model Retraining Scripts
+
+### 1. Fetch New Raw Data
+First, run the retrain script to automatically download new daily CSV files from `subwaydata.nyc` and save them into the `parquet_daily/` directory.
+
+```bash
+cd ml_service
+python -m pipeline.retrain
+```
+
+### 2. Prepare and Aggregate Data
+Run the data preparation script to produce the aggregated parquet files in the `final_data/` directory that the model trains on.
+
+```bash
+python -m pipeline.prepare_data
+```
+
+### 3. Retrain the Model
+Run the retrain script a second time to retrain the model on the full dataset and update the artifacts in the `models/` directory.
+
+```bash
+python -m pipeline.retrain
+```
+
+### 4. Deploy the Updated Model
+When retraining is complete, commit the new model files and push them to the repository, which will trigger a new deployment.
+```bash
+git add models/
+git commit -m "Update delay model with new training data"
+git push origin main
+```
+
+---
 
 ## Exploring the API Documentation
 

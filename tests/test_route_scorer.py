@@ -5,42 +5,27 @@ pytestmark = pytest.mark.unit
 
 def make_signals(**overrides) -> RouteSignals:
     defaults = dict(
-        eta_minutes=30,
-        delay_probability=0.2,
-        preference_score=0.7,
-        safety_score=0.8,
-        ml_confidence=0.9,
+        eta_minutes=30.0,
+        predicted_delay_minutes=0.0,
     )
     return RouteSignals(**{**defaults, **overrides})
 
 def test_score_is_a_float():
     assert isinstance(score_route(make_signals()), float)
 
-def test_lower_eta_scores_higher():
-    fast = make_signals(eta_minutes=10)
-    slow = make_signals(eta_minutes=60)
-    assert score_route(fast) > score_route(slow)
+def test_lower_eta_scores_better_which_means_lower():
+    fast = make_signals(eta_minutes=10.0)
+    slow = make_signals(eta_minutes=60.0)
+    assert score_route(fast) < score_route(slow)
 
-def test_lower_delay_probability_scores_higher():
-    low_delay = make_signals(delay_probability=0.1)
-    high_delay = make_signals(delay_probability=0.9)
-    assert score_route(low_delay) > score_route(high_delay)
+def test_higher_delay_increases_score_which_is_worse():
+    low_delay = make_signals(predicted_delay_minutes=0.0)
+    high_delay = make_signals(predicted_delay_minutes=10.0)
+    assert score_route(high_delay) > score_route(low_delay)
 
-def test_higher_preference_scores_higher():
-    liked = make_signals(preference_score=0.95)
-    disliked = make_signals(preference_score=0.1)
-    assert score_route(liked) > score_route(disliked)
-
-def test_higher_safety_scores_higher():
-    safe = make_signals(safety_score=1.0)
-    unsafe = make_signals(safety_score=0.1)
-    assert score_route(safe) > score_route(unsafe)
-
-def test_low_confidence_penalises_score():
-    confident = make_signals(ml_confidence=1.0)
-    uncertain = make_signals(ml_confidence=0.1)
-    assert score_route(confident) > score_route(uncertain)
-
+def test_score_is_sum_of_eta_and_delay():
+    signals = make_signals(eta_minutes=15.0, predicted_delay_minutes=5.0)
+    assert score_route(signals) == 20.0
 
 def make_candidate(name: str) -> dict:
     return {"id": name}
@@ -51,9 +36,9 @@ def test_rank_routes_returns_all_candidates():
     result = rank_routes(candidates, signals)
     assert len(result) == 3
 
-def test_ranked_routes_are_sorted_highest_first():
+def test_ranked_routes_are_sorted_lowest_score_first():
     candidates = [make_candidate("slow"), make_candidate("fast")]
-    signals = [make_signals(eta_minutes=90), make_signals(eta_minutes=10)]
+    signals = [make_signals(eta_minutes=90.0), make_signals(eta_minutes=10.0)]
     result = rank_routes(candidates, signals)
     assert result[0]["id"] == "fast"
 
@@ -69,16 +54,4 @@ def test_ranked_routes_empty_input():
 # edge cases -------
 
 def test_zero_eta_does_not_crash():
-    score_route(make_signals(eta_minutes=0))
-
-def test_perfect_route_scores_above_zero():
-    perfect = make_signals(eta_minutes=1, delay_probability=0.0,
-                           preference_score=1.0, safety_score=1.0, ml_confidence=1.0)
-    assert score_route(perfect) > 0
-
-def test_worst_route_scores_below_perfect():
-    perfect = make_signals(eta_minutes=1, delay_probability=0.0,
-                           preference_score=1.0, safety_score=1.0, ml_confidence=1.0)
-    worst = make_signals(eta_minutes=120, delay_probability=1.0,
-                         preference_score=0.0, safety_score=0.0, ml_confidence=0.0)
-    assert score_route(perfect) > score_route(worst)
+    score_route(make_signals(eta_minutes=0.0))

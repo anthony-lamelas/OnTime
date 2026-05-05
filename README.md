@@ -136,29 +136,35 @@ npm run test:e2e
 
 ## Running the Auto-Fetching and Model Retraining Scripts
 
-### 1. Fetch New Raw Data
-First, run the retrain script to automatically download new daily CSV files from `subwaydata.nyc` and save them into the `parquet_daily/` directory.
+### 1. Fully Automated Retraining (Recommended)
+You can run the entire pipeline—fetching new data, aggregating it, and retraining the model—with a single command:
 
 ```bash
 cd ml_service
 python -m pipeline.retrain
 ```
 
-### 2. Prepare and Aggregate Data
-Run the data preparation script to produce the aggregated parquet files in the `final_data/` directory that the model trains on.
+*(Note: The script will automatically detect if new data was fetched and will run the data preparation step under the hood before training).*
 
+### 2. Manual Steps (Optional)
+If you need to run specific parts of the pipeline individually, you can use the following commands:
+
+**Fetch New Raw Data Only:**
+```bash
+python -m pipeline.retrain --fetch-only
+```
+
+**Prepare and Aggregate Data:**
 ```bash
 python -m pipeline.prepare_data
 ```
 
-### 3. Retrain the Model
-Run the retrain script a second time to retrain the model on the full dataset and update the artifacts in the `models/` directory.
-
+**Retrain the Model on Existing Data:**
 ```bash
-python -m pipeline.retrain
+python -m pipeline.retrain --skip-fetch
 ```
 
-### 4. Deploy the Updated Model
+### 3. Deploy the Updated Model
 When retraining is complete, commit the new model files and push them to the repository, which will trigger a new deployment.
 ```bash
 git add models/

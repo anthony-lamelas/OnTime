@@ -13,6 +13,9 @@ ml_service/data/final_data/.
 4. Restart the ml_service to load the new model.
 ──────────────────────────────────────────────────────────────────────
 
+If you only want to fetch new raw data without training:
+    python -m pipeline.retrain --fetch-only
+
 If you only want to retrain on existing data (no new raw data):
     python -m pipeline.retrain --skip-fetch
 
@@ -304,17 +307,33 @@ def main():
     parser = argparse.ArgumentParser(description="Retrain the OnTime delay model")
     parser.add_argument("--new-file", type=str, default=None,
                         help="Path to a new CSV file to add before retraining")
+    parser.add_argument("--fetch-only", action="store_true",
+                        help="Only fetch new data from subwaydata.nyc and then exit")
+    parser.add_argument("--skip-fetch", action="store_true",
+                        help="Skip fetching new data and proceed directly to retraining")
     args = parser.parse_args()
 
     print("\n── OnTime Model Retraining Pipeline ──────────────────────────────")
 
     # Step 1: Fetch new data
+    fetched_new_daily = False
     if args.new_file:
         print(f"\n[1/5] Processing provided file: {args.new_file}")
         process_csv(Path(args.new_file))
+    elif args.skip_fetch:
+        print("\n[1/5] Skipping data fetch as requested...")
     else:
         print("\n[1/5] Fetching new data from subwaydata.nyc…")
-        fetch_new_data()
+        fetched_new_daily = fetch_new_data()
+
+    if args.fetch_only:
+        print("\n── Fetch complete. Exiting because --fetch-only was provided. ──\n")
+        return
+
+    if fetched_new_daily:
+        print("\n[1.5/5] New daily data found. Running data preparation pipeline...")
+        from pipeline.prepare_data import main as prepare_data_main
+        prepare_data_main()
 
     # Step 2: Load all data
     print("\n[2/5] Loading all parquet files…")

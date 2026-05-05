@@ -439,7 +439,6 @@ async def plan_trip(req: PlanRequest):
 
         valid_delays = [d for d in leg_delays if d is not None]
         delay_min = sum(valid_delays) if valid_delays else None
-        delay_score = min(delay_min / 10.0, 1.0) if delay_min is not None else 0.5
 
         candidate = PlanOut(
             origin_station=StationOut(**r["o_station"]),
@@ -463,10 +462,7 @@ async def plan_trip(req: PlanRequest):
 
         signals_list.append(RouteSignals(
             eta_minutes=float(total_min),
-            delay_probability=delay_score,
-            preference_score=0.7,
-            safety_score=0.8,
-            ml_confidence=0.9,
+            predicted_delay_minutes=float(delay_min) if delay_min is not None else 0.0,
         ))
 
     # Fallback: use the globally-optimal path if no per-line routes produced candidates

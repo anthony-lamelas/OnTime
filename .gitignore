@@ -27,3 +27,6 @@ __pycache__/
 
 # Ignore model files
 ml_service/models/delay_model.joblib
+
+# Ignore data
+ml_service/data/

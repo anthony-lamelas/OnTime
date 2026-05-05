@@ -30,7 +30,7 @@ import pandas as pd
 import joblib
 import lightgbm as lgb
 
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -40,6 +40,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 ML_SERVICE_DIR = Path(__file__).parent.parent
 DATA_DIR       = ML_SERVICE_DIR / "data" / "final_data"
 MODELS_DIR     = ML_SERVICE_DIR / "models"
+PARQUET_DIR = ML_SERVICE_DIR / "data" / "parquet_daily"
 
 MODEL_PATH     = MODELS_DIR / "delay_model.joblib"
 BACKUP_PATH    = MODELS_DIR / "delay_model_backup.joblib"
@@ -60,87 +61,78 @@ COLUMNS = [
 
 # ── Step 1: Fetch new data ────────────────────────────────────────────────────
 
-def fetch_new_data(output_path: Path) -> bool:
+def fetch_new_data() -> bool:
     """
-    For this project, new data is fetched and processed via prepare_data.py,
-    which handles the full pipeline:
-      - Raw daily parquet files (parquet_daily/*_part2.parquet)
-      - GTFS schedule folders (gtfs/)
-      - Matching actual vs scheduled times
-      - Aggregating into final_data/ parquet files
+    Fetch new daily CSV files from subwaydata.nyc and save to parquet_daily/.
+    Downloads only dates newer than what's already in parquet_daily/.
 
-    To add new data, run:
-        python -m pipeline.prepare_data
-
-    Then retrain with:
-        python -m pipeline.retrain --skip-fetch
-
-    If we find the original data.ny.gov source URL, we can
-    implement a direct fetch here instead.
-    """
-
-    """
-    Fetch new MTA delay data from data.ny.gov and save to final_data/.
-    Returns True if successful, False otherwise.
-    """
-
+    Source: https://subwaydata.nyc
+    URL pattern: https://subwaydata.nyc/data/subwaydatanyc_YYYY-MM-DD_csv.tar.xz
     """
     import httpx
+    import tarfile
     import io
 
-    # The Socrata API URL for the dataset — replace XXXX-XXXX with the real dataset ID
-    # Find this on the data.ny.gov dataset page under "API" → "API Endpoint"
-    BASE_URL = "https://data.ny.gov/resource/XXXX-XXXX.json"
+    PARQUET_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Fetch only data newer than what we already have
-    existing_files = sorted(glob.glob(str(DATA_DIR / "*.parquet")))
-    if existing_files:
-        # Get the most recent month_period we have e.g. "2026-01"
-        latest = pd.read_parquet(existing_files[-1])["month_period"].max()
-        where_clause = f"month_period > '{latest}'"
+    # Find the most recent date we already have
+    existing = sorted(PARQUET_DIR.glob("*_part2.parquet"))
+    if existing:
+        last = existing[-1].name[:10]  # e.g. "2026-01-15"
+        start_date = datetime.strptime(last, "%Y-%m-%d").date() + timedelta(days=1)
     else:
-        where_clause = None
+        # Default: start from Dec 2024 to match existing training data
+        start_date = date(2024, 12, 1)
 
-    params = {
-        "$limit": 500000,
-        "$order": "month_period ASC",
-    }
-    if where_clause:
-        params["$where"] = where_clause
+    end_date = datetime.now().date() - timedelta(days=1)  # yesterday
 
-    try:
-        print(f"  Fetching from {BASE_URL}…")
-        response = httpx.get(BASE_URL, params=params, timeout=120)
-        response.raise_for_status()
-
-        df = pd.read_json(io.StringIO(response.text))
-        if df.empty:
-            print("  No new data available.")
-            return False
-
-        # Rename columns to match our schema if needed
-        df = df.rename(columns={
-            "route_id": "route_name",
-            "avg_delay_sec": "avg_delay_seconds",
-            # add any other column name mappings here
-        })
-
-        # Save one parquet per month/day combination
-        for (period, dow), group in df.groupby(["month_period", "day_of_week"]):
-            out_path = DATA_DIR / f"{period}_{dow}.parquet"
-            group.to_parquet(out_path, index=False)
-            print(f"  ✓ Saved {out_path.name} ({len(group):,} rows)")
-
-        return True
-
-    except Exception as e:
-        print(f"  ✗ Fetch failed: {e}")
+    if start_date > end_date:
+        print("  No new data to fetch — already up to date.")
         return False
-    """
-    print("⚠️  fetch_new_data() not implemented.")
-    print("   Run prepare_data.py instead to process new raw data.")
-    print("   See ml_service/pipeline/prepare_data.py for details.")
-    return False
+
+    print(f"  Fetching data from {start_date} to {end_date}…")
+    fetched = 0
+
+    current = start_date
+    while current <= end_date:
+        date_str = current.strftime("%Y-%m-%d")
+        url = f"https://subwaydata.nyc/data/subwaydatanyc_{date_str}_csv.tar.xz"
+        out_path = PARQUET_DIR / f"{date_str}_part2.parquet"
+
+        if out_path.exists():
+            current += timedelta(days=1)
+            continue
+
+        try:
+            print(f"  Downloading {date_str}…", end=" ", flush=True)
+            response = httpx.get(url, timeout=30, follow_redirects=True)
+
+            if response.status_code == 404:
+                print("not found, skipping")
+                current += timedelta(days=1)
+                continue
+
+            response.raise_for_status()
+
+            # Extract CSV from tar.xz
+            with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:xz") as tar:
+                for member in tar.getmembers():
+                    if member.name.endswith(".csv"):
+                        f = tar.extractfile(member)
+                        if f:
+                            df = pd.read_csv(f)
+                            df.to_parquet(out_path, index=False)
+                            fetched += 1
+                            print(f"OK ({len(df):,} rows)")
+                            break
+
+        except Exception as e:
+            print(f"failed: {e}")
+
+        current += timedelta(days=1)
+
+    print(f"  ✓ Fetched {fetched} new daily files")
+    return fetched > 0
 
 
 # ── Step 2: Process new CSV into parquet ──────────────────────────────────────
@@ -312,22 +304,17 @@ def main():
     parser = argparse.ArgumentParser(description="Retrain the OnTime delay model")
     parser.add_argument("--new-file", type=str, default=None,
                         help="Path to a new CSV file to add before retraining")
-    parser.add_argument("--skip-fetch", action="store_true",
-                        help="Skip the data fetch step")
     args = parser.parse_args()
 
     print("\n── OnTime Model Retraining Pipeline ──────────────────────────────")
 
     # Step 1: Fetch new data
-    if not args.skip_fetch and not args.new_file:
-        print("\n[1/5] Fetching new data…")
-        fetched_path = DATA_DIR / f"new_data_{datetime.now().strftime('%Y%m%d')}.csv"
-        fetch_new_data(fetched_path)
-    elif args.new_file:
+    if args.new_file:
         print(f"\n[1/5] Processing provided file: {args.new_file}")
         process_csv(Path(args.new_file))
     else:
-        print("\n[1/5] Skipping fetch — retraining on existing data")
+        print("\n[1/5] Fetching new data from subwaydata.nyc…")
+        fetch_new_data()
 
     # Step 2: Load all data
     print("\n[2/5] Loading all parquet files…")
